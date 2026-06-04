@@ -96,6 +96,10 @@ plus `@import "tailwindcss";` at the top of `src/index.css`. For theming, use a 
   top pointer. `handleSpinEnd` reveals the winner and logs history (tagged with the place), then
   celebrates: `celebrate()` fires a `canvas-confetti` burst (skipped under `prefers-reduced-motion`)
   and `playFanfare()` plays a Web Audio chime — gated by the persisted mute toggle (`wfd-muted`).
+- **Spin sounds** (Web Audio, no assets) — `playWhoosh()` on launch, then `startTicking()` runs a
+  `requestAnimationFrame` loop that reads the wheel's real rotation (`readWheelAngle`) and
+  `playTick()`s as each segment passes the pointer, so clicks slow with the wheel; `stopTicking()`
+  on spin end. All sounds honour `muted`.
 - **History** — each entry `{ id, name, image, time, place, eaten: null|true|false, eatenAt }`;
   an "✅ Ate it / ❌ Didn't" control via `markEaten()` (older entries render as pending).
 - **Edge cases** — empty/duplicate (per-place, case-insensitive) input blocked, removing a food

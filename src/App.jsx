@@ -220,6 +220,61 @@ function playFanfare() {
   }
 }
 
+// An upward "whoosh" as the wheel launches.
+function playWhoosh() {
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sawtooth'
+    osc.frequency.setValueAtTime(180, now)
+    osc.frequency.exponentialRampToValueAtTime(900, now + 0.35)
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.05)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.4)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start(now)
+    osc.stop(now + 0.42)
+  } catch {
+    // best-effort
+  }
+}
+
+// A short "click" as a wheel segment passes the pointer.
+function playTick() {
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'square'
+    osc.frequency.value = 1250
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.07, now + 0.002)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start(now)
+    osc.stop(now + 0.04)
+  } catch {
+    // best-effort
+  }
+}
+
+// Read the wheel's current visual rotation (degrees, 0–360) from its transform.
+function readWheelAngle(el) {
+  const t = el && getComputedStyle(el).transform
+  if (!t || t === 'none') return 0
+  const m = t.match(/matrix\(([^)]+)\)/)
+  if (!m) return 0
+  const [a, b] = m[1].split(',').map(Number)
+  let deg = (Math.atan2(b, a) * 180) / Math.PI
+  if (deg < 0) deg += 360
+  return deg
+}
+
 /* -------------------------------------------------------------------------- */
 /*  App                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -245,6 +300,8 @@ export default function App() {
   const [isSpinning, setIsSpinning] = useState(false)
   const [winner, setWinner] = useState(null) // food object once spin resolves
   const winnerIndexRef = useRef(null)
+  const wheelRef = useRef(null) // the rotating disc, read for spin tick sounds
+  const tickRafRef = useRef(null)
 
   /* ------------------------------ Persistence ----------------------------- */
   useEffect(() => {
@@ -499,6 +556,46 @@ export default function App() {
     })
   }
 
+  /* --------------------------- Spin tick sounds -------------------------- */
+  // Click each time a segment passes the pointer. We read the wheel's real
+  // rotation per frame, so clicks naturally start as a fast buzz and slow to
+  // distinct ticks as the wheel decelerates. (Capped to one click per frame.)
+  function startTicking() {
+    if (muted) return
+    const el = wheelRef.current
+    if (!el) return
+    const seg = 360 / Math.max(foods.length, 1)
+    let prev = readWheelAngle(el)
+    let traveled = 0
+    let nextTick = seg
+    const step = () => {
+      const cur = readWheelAngle(el)
+      let d = cur - prev
+      if (d < -180) d += 360 // crossed the 360→0 wrap
+      if (d < 0) d = 0 // ignore sub-pixel jitter
+      traveled += d
+      prev = cur
+      let played = false
+      while (traveled >= nextTick) {
+        nextTick += seg
+        if (!played) {
+          playTick()
+          played = true
+        }
+      }
+      tickRafRef.current = requestAnimationFrame(step)
+    }
+    tickRafRef.current = requestAnimationFrame(step)
+  }
+  function stopTicking() {
+    if (tickRafRef.current) cancelAnimationFrame(tickRafRef.current)
+    tickRafRef.current = null
+  }
+  // Stop any in-flight tick loop on unmount.
+  useEffect(() => () => {
+    if (tickRafRef.current) cancelAnimationFrame(tickRafRef.current)
+  }, [])
+
   /* -------------------------------- Spin --------------------------------- */
   function handleSpin() {
     if (isSpinning || foods.length < 2) return
@@ -520,9 +617,17 @@ export default function App() {
     const fullSpins = 6
     setRotation(rotation + fullSpins * 360 + delta)
     setIsSpinning(true)
+
+    if (!muted) {
+      playWhoosh()
+      startTicking()
+    }
+    // Safety net: stop ticking even if the transitionend event is missed.
+    setTimeout(stopTicking, SPIN_MS + 300)
   }
 
   function handleSpinEnd() {
+    stopTicking()
     if (!isSpinning) return
     setIsSpinning(false)
     const idx = winnerIndexRef.current
@@ -654,6 +759,7 @@ export default function App() {
             <div className="rounded-full bg-gradient-to-br from-amber-300 to-rose-400 p-1.5 shadow-2xl shadow-rose-500/20 sm:p-2">
               {/* Spinning disc */}
               <div
+                ref={wheelRef}
                 onTransitionEnd={handleSpinEnd}
                 className="relative h-72 w-72 rounded-full sm:h-96 sm:w-96"
                 style={{
