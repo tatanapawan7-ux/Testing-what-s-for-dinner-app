@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import confetti from 'canvas-confetti'
 
 /* -------------------------------------------------------------------------- */
 /*  Food photography                                                          */
@@ -195,6 +196,51 @@ function formatDate(ts) {
   })
 }
 
+const prefersReducedMotion = () =>
+  typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+
+// A short celebratory confetti burst over the winner modal.
+function celebrate() {
+  if (prefersReducedMotion()) return
+  const opts = { spread: 70, startVelocity: 45, ticks: 200, zIndex: 100 }
+  confetti({ ...opts, particleCount: 80, origin: { x: 0.5, y: 0.6 } })
+  confetti({ ...opts, particleCount: 40, angle: 60, origin: { x: 0, y: 0.7 } })
+  confetti({ ...opts, particleCount: 40, angle: 120, origin: { x: 1, y: 0.7 } })
+}
+
+// A self-contained "ta-da" chime via Web Audio — no audio asset needed.
+let audioCtx = null
+function getAudioContext() {
+  if (typeof window === 'undefined') return null
+  const Ctx = window.AudioContext || window.webkitAudioContext
+  if (!Ctx) return null
+  if (!audioCtx) audioCtx = new Ctx()
+  return audioCtx
+}
+function playFanfare() {
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+    // C5, E5, G5, C6 — a bright major arpeggio.
+    ;[523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'triangle'
+      osc.frequency.value = freq
+      const t = now + i * 0.12
+      gain.gain.setValueAtTime(0.0001, t)
+      gain.gain.exponentialRampToValueAtTime(0.25, t + 0.03)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start(t)
+      osc.stop(t + 0.4)
+    })
+  } catch {
+    // Audio is best-effort; never let it break the win.
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /*  App                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -213,6 +259,8 @@ export default function App() {
   const [placeModal, setPlaceModal] = useState(null) // { mode:'add'|'edit', id?, name, emoji }
   // Photo picker shown when adding a food: { name, status, results, selectedId }
   const [photoPicker, setPhotoPicker] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null) // food pending removal
+  const [muted, setMuted] = useState(() => loadState('wfd-muted', false))
 
   const [rotation, setRotation] = useState(0)
   const [isSpinning, setIsSpinning] = useState(false)
@@ -228,6 +276,9 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('wfd-history', JSON.stringify(history))
   }, [history])
+  useEffect(() => {
+    localStorage.setItem('wfd-muted', JSON.stringify(muted))
+  }, [muted])
 
   // Auto-clear transient toasts.
   useEffect(() => {
@@ -314,12 +365,22 @@ export default function App() {
     commitFood(photoPicker.name, chosen?.thumb)
   }
 
-  function handleDelete(id) {
+  // Ask before removing — but keep the min-2 guard up front (no dialog if blocked).
+  function requestDelete(food) {
     if (foods.length <= 2) {
       setError('Keep at least 2 options to spin.')
       return
     }
+    setConfirmDelete(food)
+  }
+
+  function handleDelete(id) {
     updateActivePlaceFoods((list) => list.filter((f) => f.id !== id))
+  }
+
+  function confirmRemove() {
+    if (confirmDelete) handleDelete(confirmDelete.id)
+    setConfirmDelete(null)
   }
 
   /* ----------------------------- Place actions --------------------------- */
@@ -419,6 +480,9 @@ export default function App() {
     if (isSpinning || foods.length < 2) return
     setError('')
 
+    // Resume the audio context on this user gesture so the win chime can play.
+    if (!muted) getAudioContext()?.resume?.()
+
     const winnerIndex = Math.floor(Math.random() * foods.length)
     winnerIndexRef.current = winnerIndex
 
@@ -441,6 +505,8 @@ export default function App() {
     if (idx == null || !foods[idx]) return
     const win = foods[idx]
     setWinner(win)
+    celebrate()
+    if (!muted) playFanfare()
     setHistory((prev) => [
       {
         id: uid('hist'),
@@ -472,7 +538,17 @@ export default function App() {
   /* -------------------------------------------------------------------------- */
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-neutral-950 text-slate-100">
-      <div className="mx-auto flex max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
+      <div className="relative mx-auto flex max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
+        {/* Sound toggle */}
+        <button
+          onClick={() => setMuted((m) => !m)}
+          aria-label={muted ? 'Unmute sound' : 'Mute sound'}
+          title={muted ? 'Sound off' : 'Sound on'}
+          className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10 sm:right-6"
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
+
         {/* Header */}
         <header className="text-center">
           <h1 className="bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl">
@@ -646,7 +722,7 @@ export default function App() {
                   <span className="text-sm font-semibold text-white drop-shadow">{food.name}</span>
                 </div>
                 <button
-                  onClick={() => handleDelete(food.id)}
+                  onClick={() => requestDelete(food)}
                   aria-label={`Remove ${food.name}`}
                   className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-all duration-300 hover:bg-rose-500"
                 >
@@ -933,6 +1009,39 @@ export default function App() {
             <p className="mt-3 text-center text-[11px] text-slate-600">
               Photos via Openverse (Creative Commons)
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm remove food */}
+      {confirmDelete && (
+        <div
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={() => setConfirmDelete(null)}
+        >
+          <div
+            className="animate-pop-in w-full max-w-sm rounded-3xl bg-slate-900 p-6 text-center shadow-2xl ring-1 ring-white/15"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-white">Remove this dish?</h3>
+            <p className="mt-2 text-sm text-slate-400">
+              <span className="font-semibold text-slate-200">{confirmDelete.name}</span> will be
+              removed from {activePlace.emoji} {activePlace.name}.
+            </p>
+            <div className="mt-6 flex items-center gap-2">
+              <button
+                onClick={confirmRemove}
+                className="flex-1 rounded-xl bg-gradient-to-r from-rose-500 to-red-500 px-4 py-3 font-bold text-white shadow-lg shadow-rose-500/25 transition-all duration-300 hover:scale-[1.02] active:scale-95"
+              >
+                Remove
+              </button>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 rounded-xl bg-white/5 px-4 py-3 font-medium text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

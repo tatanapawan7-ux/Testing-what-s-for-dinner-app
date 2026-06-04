@@ -87,11 +87,14 @@ plus `@import "tailwindcss";` at the top of `src/index.css`. For theming, use a 
   `wfd-history`.
 - **Wheel** — CSS `conic-gradient` slices + rotated labels; spin sets a large `rotation` with a
   `cubic-bezier(0.1, 0.8, 0.3, 1)` transition solved so the precomputed winner lands under the
-  top pointer. `handleSpinEnd` reveals the winner and logs history (tagged with the place).
+  top pointer. `handleSpinEnd` reveals the winner and logs history (tagged with the place), then
+  celebrates: `celebrate()` fires a `canvas-confetti` burst (skipped under `prefers-reduced-motion`)
+  and `playFanfare()` plays a Web Audio chime — gated by the persisted mute toggle (`wfd-muted`).
 - **History** — each entry `{ id, name, image, time, place, eaten: null|true|false, eatenAt }`;
   an "✅ Ate it / ❌ Didn't" control via `markEaten()` (older entries render as pending).
-- **Edge cases** — empty/duplicate (per-place, case-insensitive) input blocked, deletion blocked
-  below 2 items, spin disabled while spinning or under 2 options, empty place shows a hint. Two
+- **Edge cases** — empty/duplicate (per-place, case-insensitive) input blocked, removing a food
+  asks via a confirm dialog (`confirmDelete`) and is blocked below 2 items, spin disabled while
+  spinning or under 2 options, empty place shows a hint. Two
   auto-clearing toasts: `error` (validation, by the wheel) and `status` (location, by the bar).
 
 Prefer extending these existing helpers over duplicating logic.

@@ -11,7 +11,8 @@ a celebratory winner modal and a persistent history of past spins.
   GPS "use my location" auto-switch to the nearest place you've pinned
 - ➕ **Menu management** — add/remove dishes per place; adding a dish shows a **photo picker**
   of ~8 matching images (via the keyless Openverse CC search) so the picture fits the food
-- 🎉 **Winner modal** announcing tonight's dinner with a large image
+- 🎉 **Winner modal** with a confetti burst + celebratory chime (sound has a mute toggle)
+- 🗑️ **Confirm-before-delete** so you don't remove a dish by accident
 - 🕑 **Dinner history** timeline (tagged by place), persisted in `localStorage`
 - 📱 Responsive, mobile-first UI built with Tailwind CSS
 
