@@ -68,16 +68,19 @@ plus `@import "tailwindcss";` at the top of `src/index.css`. For theming, use a 
 
 ## Architecture (`src/App.jsx`)
 
-- **Food** = `{ id, name, image }`. `makeFood(name, image?)` builds one with a `uid()`; if no
-  image is given it falls back to `imageForFood(name, size)`, which maps a name to a curated
-  Unsplash photo (keyword lookup in `FOOD_PHOTO_IDS`, else a hashed `FALLBACK_PHOTO_IDS` pool).
+- **Food** = `{ id, name, image }`. `makeFood(name, image?)` builds one with a `uid()`;
+  `image` is `null` until a photo is chosen/fetched. **All food imagery comes from Openverse**
+  (keyless CC search) — there is no curated/Unsplash map anymore.
 - **Adding food** opens a **photo picker** (`photoPicker` state): `searchFoodImages()` queries
-  the keyless **Openverse** CC image API for ~8 matches; the user picks one, or "Use default"
-  falls back to `imageForFood()`. On network/empty errors it degrades to the default image so
-  adding never breaks. (Seeded/migrated foods still use `imageForFood`.)
+  Openverse for ~8 matches; the user picks one (or "Use default" → `null` image). On
+  network/empty errors it degrades to a placeholder so adding never breaks.
+- **Seeded / legacy foods** start with `image: null`. A heal `useEffect` (keyed on
+  `activePlaceId`, one gentle throttled pass per place per session, results persisted) fetches
+  a photo from Openverse for any food that is missing an image (or still has an old
+  `images.unsplash.com` URL from a previous version), so starter menus fill in on first view.
 - **Image loading** — all food images render through `<FoodImage>`, which sets
-  `referrerPolicy="no-referrer"` (avoids hotlink blocks) and, on load error, swaps to an
-  inline-SVG `placeholderImage(name)` so a dead/blocked photo never shows a broken icon.
+  `referrerPolicy="no-referrer"` (avoids hotlink blocks) and, on load error or `null` src,
+  shows an inline-SVG `placeholderImage(name)` so a dead/blocked photo never breaks the layout.
 - **Places** = `{ id, name, emoji, coords|null, foods[] }`. State is `places` + `activePlaceId`;
   the active place feeds the wheel/menu. Edit the current menu only via
   `updateActivePlaceFoods()`; add/edit/delete places via the `placeModal` (≥1 place always kept).
@@ -109,7 +112,7 @@ Prefer extending these existing helpers over duplicating logic.
   express (keyframes, resets).
 - `PascalCase` component files, `camelCase` helpers/variables.
 - Keep state local; introduce a store/router only if scope genuinely grows (and document it).
-- Route all food imagery through `imageForFood()`; add new known foods to `FOOD_PHOTO_IDS`.
+- Route all food imagery through Openverse (`searchFoodImages`) and render via `<FoodImage>`.
 
 ## Git & Notes
 

@@ -4,55 +4,10 @@ import confetti from 'canvas-confetti'
 /* -------------------------------------------------------------------------- */
 /*  Food photography                                                          */
 /* -------------------------------------------------------------------------- */
-// Curated, high-quality Unsplash photo IDs for common foods. Picking by
-// keyword keeps the imagery crisp and relevant. Unknown foods fall back to a
-// rotating pool of appetizing shots (varied with an `&sig=` cache-buster).
-const FOOD_PHOTO_IDS = {
-  pizza: 'photo-1513104890138-7c749659a591',
-  sushi: 'photo-1579871494447-9811cf80d66c',
-  burger: 'photo-1568901346375-23c9450c58cd',
-  burgers: 'photo-1568901346375-23c9450c58cd',
-  taco: 'photo-1565299624946-b28f40a0ae38',
-  tacos: 'photo-1565299624946-b28f40a0ae38',
-  thai: 'photo-1559314809-0d155014e29e',
-  pasta: 'photo-1551183053-bf91a1d81141',
-  spaghetti: 'photo-1551183053-bf91a1d81141',
-  salad: 'photo-1512621776951-a57141f2eefd',
-  ramen: 'photo-1569718212165-3a8278d5f624',
-  steak: 'photo-1546964124-0cce460f38ef',
-  curry: 'photo-1455619452474-d2be8b1e70cd',
-  indian: 'photo-1455619452474-d2be8b1e70cd',
-  sandwich: 'photo-1528735602780-2552fd46c7af',
-  pancakes: 'photo-1567620905732-2d1ec7ab7445',
-  breakfast: 'photo-1567620905732-2d1ec7ab7445',
-  noodles: 'photo-1612929633738-8fe44f7ec841',
-  chicken: 'photo-1604908176997-125f25cc6f3d',
-  fried: 'photo-1604908176997-125f25cc6f3d',
-  bbq: 'photo-1529193591184-b1d58069ecdd',
-  barbecue: 'photo-1529193591184-b1d58069ecdd',
-  dumplings: 'photo-1496116218417-1a781b1c416c',
-  chinese: 'photo-1525755662778-989d0524087e',
-  mexican: 'photo-1565299624946-b28f40a0ae38',
-  seafood: 'photo-1559339352-11d035aa65de',
-  fish: 'photo-1559339352-11d035aa65de',
-  soup: 'photo-1547592180-85f173990554',
-  dessert: 'photo-1551024601-bec78aea704b',
-  cake: 'photo-1578985545062-69928b1d9587',
-  vegan: 'photo-1512621776951-a57141f2eefd',
-  vegetarian: 'photo-1512621776951-a57141f2eefd',
-  korean: 'photo-1590301157890-4810ed352733',
-  italian: 'photo-1513104890138-7c749659a591',
-  japanese: 'photo-1579871494447-9811cf80d66c',
-}
-
-// Generic, always-appetizing fallbacks for unrecognised keywords.
-const FALLBACK_PHOTO_IDS = [
-  'photo-1504674900247-0877df9cc836',
-  'photo-1476224203421-9ac39bcb3327',
-  'photo-1493770348161-369560ae357d',
-  'photo-1414235077428-338989a2e8c0',
-  'photo-1540189549336-e6e99c3679fe',
-]
+// Food photos come from Openverse (see `searchFoodImages`): the user picks one
+// when adding a dish, and seeded/default foods are healed from Openverse on
+// first view (see the heal effect in App). Until an image resolves — or if it
+// fails to load — `placeholderImage` renders a labelled tile.
 
 function hashString(str) {
   let hash = 0
@@ -61,27 +16,6 @@ function hashString(str) {
     hash |= 0 // force 32-bit int
   }
   return Math.abs(hash)
-}
-
-// Build an optimized Unsplash URL for a given food name + keyword match.
-function imageForFood(name, size = 500) {
-  const key = name.trim().toLowerCase().replace(/\s+/g, '')
-  const words = name.trim().toLowerCase().split(/\s+/)
-
-  let photoId = FOOD_PHOTO_IDS[key]
-  if (!photoId) {
-    // Try matching any single word in the name against the keyword map.
-    const matchWord = words.find((w) => FOOD_PHOTO_IDS[w])
-    photoId = matchWord ? FOOD_PHOTO_IDS[matchWord] : null
-  }
-
-  const hash = hashString(key || name)
-  if (!photoId) {
-    photoId = FALLBACK_PHOTO_IDS[hash % FALLBACK_PHOTO_IDS.length]
-  }
-
-  // `sig` keeps fallbacks visually distinct without breaking the CDN cache.
-  return `https://images.unsplash.com/${photoId}?auto=format&fit=crop&w=${size}&q=80&sig=${hash % 1000}`
 }
 
 // A guaranteed-to-render inline SVG, used whenever a remote photo fails to load
@@ -126,14 +60,15 @@ function uid(prefix) {
 }
 
 function makeFood(name, image) {
+  // No image yet → null; the heal effect fills seeded foods from Openverse, and
+  // `placeholderImage` covers the gap. (Added foods pass the chosen photo.)
   const clean = name.trim()
-  return { id: uid('food'), name: clean, image: image || imageForFood(clean) }
+  return { id: uid('food'), name: clean, image: image ?? null }
 }
 
-// Search Openverse (Creative-Commons image search, no API key) for ~6 photos
-// matching a food name, so the user can pick the one that actually looks right.
-// Returns [{ id, thumb, title }]; throws on network/HTTP errors so the caller
-// can fall back to imageForFood().
+// Search Openverse (Creative-Commons image search, no API key) for matching
+// food photos. Returns [{ id, thumb, title }]; throws on network/HTTP errors so
+// callers can fall back to a placeholder.
 async function searchFoodImages(query, count = 6) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 8000)
@@ -163,7 +98,7 @@ function makePlace(name, emoji, foodNames = []) {
     name: name.trim(),
     emoji,
     coords: null, // { lat, lng } once the user pins it
-    foods: foodNames.map(makeFood),
+    foods: foodNames.map((n) => makeFood(n)),
   }
 }
 
@@ -180,7 +115,7 @@ function bootstrapPlaces() {
   home.foods =
     Array.isArray(oldFoods) && oldFoods.length
       ? oldFoods
-      : ['Pizza', 'Sushi', 'Burgers', 'Tacos', 'Thai'].map(makeFood)
+      : ['Pizza', 'Sushi', 'Burgers', 'Tacos', 'Thai'].map((n) => makeFood(n))
 
   const mall = makePlace('Mall', '🛍️', ['Burgers', 'Ramen', 'Sushi', 'Pizza', 'Dumplings'])
   const work = makePlace('Work', '💼', ['Salad', 'Sandwich', 'Curry', 'Noodles'])
@@ -348,6 +283,51 @@ export default function App() {
       .join(', ')
     return `conic-gradient(${stops})`
   }, [foods, segAngle])
+
+  // Heal seeded / legacy foods (no image, or a dead Unsplash URL) by fetching a
+  // photo from Openverse the first time their place is viewed — one gentle pass
+  // per place per session; results persist, so it's a one-time cost.
+  const placesRef = useRef(places)
+  useEffect(() => {
+    placesRef.current = places
+  }, [places])
+  const healedPlaces = useRef(new Set())
+  useEffect(() => {
+    const place = placesRef.current.find((p) => p.id === activePlaceId) ?? placesRef.current[0]
+    if (!place || healedPlaces.current.has(place.id)) return
+    healedPlaces.current.add(place.id) // mark up front so re-renders don't re-enter
+    const needs = place.foods.filter((f) => !f.image || f.image.includes('images.unsplash.com'))
+    if (!needs.length) return
+    let cancelled = false
+    ;(async () => {
+      for (const food of needs) {
+        if (cancelled) break
+        try {
+          const [first] = await searchFoodImages(food.name, 1)
+          if (first?.thumb && !cancelled) {
+            setPlaces((prev) =>
+              prev.map((p) =>
+                p.id === place.id
+                  ? {
+                      ...p,
+                      foods: p.foods.map((f) =>
+                        f.id === food.id ? { ...f, image: first.thumb } : f,
+                      ),
+                    }
+                  : p,
+              ),
+            )
+          }
+        } catch {
+          // leave the placeholder in place
+        }
+        await new Promise((r) => setTimeout(r, 600)) // be gentle on the API
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [activePlaceId])
 
   /* ----------------------------- Food actions ---------------------------- */
   function updateActivePlaceFoods(updater) {
@@ -857,7 +837,7 @@ export default function App() {
             <div className="relative h-56 w-full">
               <FoodImage
                 name={winner.name}
-                src={winner.image || imageForFood(winner.name, 800)}
+                src={winner.image}
                 className="h-full w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent" />
