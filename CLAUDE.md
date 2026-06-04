@@ -68,9 +68,13 @@ plus `@import "tailwindcss";` at the top of `src/index.css`. For theming, use a 
 
 ## Architecture (`src/App.jsx`)
 
-- **Food** = `{ id, name, image }`. `imageForFood(name, size)` maps a name to an Unsplash photo
-  (keyword lookup in `FOOD_PHOTO_IDS`, else a hashed `FALLBACK_PHOTO_IDS` pool); `makeFood()`
-  builds one with a `uid()`.
+- **Food** = `{ id, name, image }`. `makeFood(name, image?)` builds one with a `uid()`; if no
+  image is given it falls back to `imageForFood(name, size)`, which maps a name to a curated
+  Unsplash photo (keyword lookup in `FOOD_PHOTO_IDS`, else a hashed `FALLBACK_PHOTO_IDS` pool).
+- **Adding food** opens a **photo picker** (`photoPicker` state): `searchFoodImages()` queries
+  the keyless **Openverse** CC image API for ~6 matches; the user picks one, or "Use default"
+  falls back to `imageForFood()`. On network/empty errors it degrades to the default image so
+  adding never breaks. (Seeded/migrated foods still use `imageForFood`.)
 - **Places** = `{ id, name, emoji, coords|null, foods[] }`. State is `places` + `activePlaceId`;
   the active place feeds the wheel/menu. Edit the current menu only via
   `updateActivePlaceFoods()`; add/edit/delete places via the `placeModal` (≥1 place always kept).

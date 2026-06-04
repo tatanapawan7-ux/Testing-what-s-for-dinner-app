@@ -87,9 +87,31 @@ function uid(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
 
-function makeFood(name) {
+function makeFood(name, image) {
   const clean = name.trim()
-  return { id: uid('food'), name: clean, image: imageForFood(clean) }
+  return { id: uid('food'), name: clean, image: image || imageForFood(clean) }
+}
+
+// Search Openverse (Creative-Commons image search, no API key) for ~6 photos
+// matching a food name, so the user can pick the one that actually looks right.
+// Returns [{ id, thumb, title }]; throws on network/HTTP errors so the caller
+// can fall back to imageForFood().
+async function searchFoodImages(query, count = 6) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 8000)
+  try {
+    const url = `https://api.openverse.org/v1/images/?q=${encodeURIComponent(
+      query,
+    )}&page_size=${count}&mature=false`
+    const res = await fetch(url, { signal: controller.signal })
+    if (!res.ok) throw new Error(`Openverse HTTP ${res.status}`)
+    const data = await res.json()
+    return (data.results ?? [])
+      .map((r) => ({ id: r.id, thumb: r.thumbnail || r.url, title: r.title || query }))
+      .filter((r) => r.thumb)
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -189,6 +211,8 @@ export default function App() {
   const [status, setStatus] = useState('') // location feedback (shown by the location bar)
   const [locating, setLocating] = useState(false)
   const [placeModal, setPlaceModal] = useState(null) // { mode:'add'|'edit', id?, name, emoji }
+  // Photo picker shown when adding a food: { name, status, results, selectedId }
+  const [photoPicker, setPhotoPicker] = useState(null)
 
   const [rotation, setRotation] = useState(0)
   const [isSpinning, setIsSpinning] = useState(false)
@@ -244,6 +268,15 @@ export default function App() {
     )
   }
 
+  // Adds a finished food object to the active menu and resets the input.
+  function commitFood(name, image) {
+    updateActivePlaceFoods((list) => [...list, makeFood(name, image)])
+    setInput('')
+    setError('')
+    setPhotoPicker(null)
+  }
+
+  // Validate the input, then open the photo picker and search Openverse for it.
   function handleAddFood(e) {
     e.preventDefault()
     const name = input.trim()
@@ -255,9 +288,30 @@ export default function App() {
       setError(`"${name}" is already on ${activePlace.name}'s menu.`)
       return
     }
-    updateActivePlaceFoods((list) => [...list, makeFood(name)])
-    setInput('')
     setError('')
+    setPhotoPicker({ name, status: 'loading', results: [], selectedId: null })
+    searchFoodImages(name, 6)
+      .then((results) =>
+        setPhotoPicker((p) =>
+          p && p.name === name
+            ? {
+                ...p,
+                status: results.length ? 'ok' : 'empty',
+                results,
+                selectedId: results[0]?.id ?? null,
+              }
+            : p,
+        ),
+      )
+      .catch(() =>
+        setPhotoPicker((p) => (p && p.name === name ? { ...p, status: 'error' } : p)),
+      )
+  }
+
+  function confirmPhoto() {
+    const chosen = photoPicker.results.find((r) => r.id === photoPicker.selectedId)
+    // Fall back to the keyword/hash image if nothing was selectable.
+    commitFood(photoPicker.name, chosen?.thumb)
   }
 
   function handleDelete(id) {
@@ -691,7 +745,7 @@ export default function App() {
           >
             <div className="relative h-56 w-full">
               <img
-                src={imageForFood(winner.name, 800)}
+                src={winner.image || imageForFood(winner.name, 800)}
                 alt={winner.name}
                 className="h-full w-full object-cover"
               />
@@ -793,6 +847,92 @@ export default function App() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo picker (shown when adding a food) */}
+      {photoPicker && (
+        <div
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={() => setPhotoPicker(null)}
+        >
+          <div
+            className="animate-pop-in w-full max-w-md rounded-3xl bg-slate-900 p-6 shadow-2xl ring-1 ring-white/15"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-white">
+              Pick a photo for <span className="text-amber-300">{photoPicker.name}</span>
+            </h3>
+            <p className="mb-4 mt-1 text-sm text-slate-400">
+              Tap the one that looks right, then add it to your menu.
+            </p>
+
+            {photoPicker.status === 'loading' && (
+              <div className="flex h-40 items-center justify-center text-slate-400">
+                Finding photos…
+              </div>
+            )}
+
+            {photoPicker.status === 'ok' && (
+              <div className="grid grid-cols-3 gap-2">
+                {photoPicker.results.map((r) => {
+                  const selected = r.id === photoPicker.selectedId
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => setPhotoPicker((p) => ({ ...p, selectedId: r.id }))}
+                      className={`relative aspect-square overflow-hidden rounded-xl transition-all duration-200 ${
+                        selected ? 'ring-2 ring-amber-400' : 'ring-1 ring-white/10 hover:ring-white/30'
+                      }`}
+                    >
+                      <img src={r.thumb} alt={r.title} className="h-full w-full object-cover" />
+                      {selected && (
+                        <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-xs text-slate-900">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {(photoPicker.status === 'empty' || photoPicker.status === 'error') && (
+              <p className="rounded-xl bg-white/5 px-4 py-6 text-center text-sm text-slate-400 ring-1 ring-white/10">
+                {photoPicker.status === 'error'
+                  ? 'Couldn’t reach the photo search.'
+                  : `No photos found for "${photoPicker.name}".`}{' '}
+                You can still add it with a default image.
+              </p>
+            )}
+
+            <div className="mt-6 flex items-center gap-2">
+              <button
+                onClick={confirmPhoto}
+                disabled={photoPicker.status === 'loading' || photoPicker.selectedId == null}
+                className="flex-1 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-500/25 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+              >
+                Add to menu
+              </button>
+              <button
+                onClick={() => commitFood(photoPicker.name)}
+                disabled={photoPicker.status === 'loading'}
+                className="rounded-xl bg-white/5 px-4 py-3 text-sm font-medium text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10 disabled:opacity-50"
+              >
+                Use default
+              </button>
+              <button
+                onClick={() => setPhotoPicker(null)}
+                className="rounded-xl bg-white/5 px-4 py-3 text-sm font-medium text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <p className="mt-3 text-center text-[11px] text-slate-600">
+              Photos via Openverse (Creative Commons)
+            </p>
           </div>
         </div>
       )}
