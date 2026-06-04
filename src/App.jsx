@@ -290,7 +290,7 @@ export default function App() {
     }
     setError('')
     setPhotoPicker({ name, status: 'loading', results: [], selectedId: null })
-    searchFoodImages(name, 6)
+    searchFoodImages(name, 8)
       .then((results) =>
         setPhotoPicker((p) =>
           p && p.name === name
@@ -648,7 +648,7 @@ export default function App() {
                 <button
                   onClick={() => handleDelete(food.id)}
                   aria-label={`Remove ${food.name}`}
-                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white opacity-0 backdrop-blur transition-all duration-300 hover:bg-rose-500 group-hover:opacity-100"
+                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-all duration-300 hover:bg-rose-500"
                 >
                   ✕
                 </button>
@@ -875,7 +875,7 @@ export default function App() {
             )}
 
             {photoPicker.status === 'ok' && (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {photoPicker.results.map((r) => {
                   const selected = r.id === photoPicker.selectedId
                   return (

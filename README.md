@@ -10,7 +10,7 @@ a celebratory winner modal and a persistent history of past spins.
 - 📍 **Location profiles** — separate menus per place (Home, Mall, Work…), with optional
   GPS "use my location" auto-switch to the nearest place you've pinned
 - ➕ **Menu management** — add/remove dishes per place; adding a dish shows a **photo picker**
-  of ~6 matching images (via the keyless Openverse CC search) so the picture fits the food
+  of ~8 matching images (via the keyless Openverse CC search) so the picture fits the food
 - 🎉 **Winner modal** announcing tonight's dinner with a large image
 - 🕑 **Dinner history** timeline (tagged by place), persisted in `localStorage`
 - 📱 Responsive, mobile-first UI built with Tailwind CSS
