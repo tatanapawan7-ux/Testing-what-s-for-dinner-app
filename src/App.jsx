@@ -163,6 +163,16 @@ function loadState(key, fallback) {
   }
 }
 
+function formatDate(ts) {
+  return new Date(ts).toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 /* -------------------------------------------------------------------------- */
 /*  App                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -389,6 +399,19 @@ export default function App() {
     ])
   }
 
+  /* ----------------------------- History actions ------------------------- */
+  // Record whether the user actually went and ate the suggested dinner.
+  // Tapping the already-selected status clears it back to "pending".
+  function markEaten(id, value) {
+    setHistory((prev) =>
+      prev.map((e) => {
+        if (e.id !== id) return e
+        const next = e.eaten === value ? null : value
+        return { ...e, eaten: next, eatenAt: next === true ? Date.now() : null }
+      }),
+    )
+  }
+
   const canSpin = foods.length >= 2 && !isSpinning
   const editingPlace = placeModal?.id ? places.find((p) => p.id === placeModal.id) : null
 
@@ -592,7 +615,7 @@ export default function App() {
               {history.map((entry) => (
                 <li
                   key={entry.id}
-                  className="animate-fade-in flex items-center gap-4 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+                  className="animate-fade-in flex items-start gap-4 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
                 >
                   <img
                     src={entry.image}
@@ -609,17 +632,42 @@ export default function App() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-400">
-                      {new Date(entry.time).toLocaleString(undefined, {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
-                    </p>
+                    <p className="text-xs text-slate-400">Spun {formatDate(entry.time)}</p>
+                    {entry.eaten === true && (
+                      <p className="text-xs font-medium text-emerald-400">
+                        ✓ Ate this{entry.eatenAt ? ` · ${formatDate(entry.eatenAt)}` : ''}
+                      </p>
+                    )}
+                    {entry.eaten === false && (
+                      <p className="text-xs font-medium text-slate-500">✗ Didn’t go</p>
+                    )}
                   </div>
-                  <span className="text-xl">🍴</span>
+
+                  {/* Did you actually go eat this? */}
+                  <div className="flex shrink-0 flex-col items-stretch gap-1">
+                    <button
+                      onClick={() => markEaten(entry.id, true)}
+                      aria-pressed={entry.eaten === true}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-200 ${
+                        entry.eaten === true
+                          ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
+                          : 'bg-white/5 text-slate-400 ring-1 ring-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      ✅ Ate it
+                    </button>
+                    <button
+                      onClick={() => markEaten(entry.id, false)}
+                      aria-pressed={entry.eaten === false}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-200 ${
+                        entry.eaten === false
+                          ? 'bg-rose-500/20 text-rose-300 ring-1 ring-rose-500/40'
+                          : 'bg-white/5 text-slate-400 ring-1 ring-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      ❌ Didn’t
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

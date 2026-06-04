@@ -110,6 +110,11 @@ Key pieces, all in one file:
   (tagged with the active place).
 - **Winner modal** — overlay celebrating the result with a large Unsplash image; closes on
   backdrop click or the Close button.
+- **History tracking** — each entry is
+  `{ id, name, image, time, place, eaten: null|true|false, eatenAt }`. The card shows the
+  spin date and an "✅ Ate it / ❌ Didn't" control; `markEaten(id, value)` toggles whether
+  the user actually went (tapping the active choice clears it), stamping `eatenAt` on
+  confirmation. Older entries without `eaten` render as pending — backward-compatible.
 - **Edge cases handled** — empty/whitespace input is rejected, duplicate names (case-
   insensitive, per place) are blocked, deletion is prevented below 2 items, spinning is
   disabled while a spin is in progress or with fewer than 2 options, and an empty place
