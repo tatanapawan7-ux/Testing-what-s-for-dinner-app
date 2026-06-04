@@ -36,12 +36,19 @@ function placeholderImage(name) {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
-// Food <img> that falls back to a placeholder on error and avoids hotlink
-// blocks via a no-referrer policy.
+// True when a stored image can't be used as-is and should be (re)fetched: empty,
+// a non-string (older versions accidentally stored array indices), or a dead
+// `images.unsplash.com` URL from a previous version.
+function needsImage(img) {
+  return typeof img !== 'string' || img === '' || img.includes('images.unsplash.com')
+}
+
+// Food <img> that falls back to a placeholder on error / missing src and avoids
+// hotlink blocks via a no-referrer policy.
 function FoodImage({ name, src, className }) {
   return (
     <img
-      src={src || placeholderImage(name)}
+      src={typeof src === 'string' && src ? src : placeholderImage(name)}
       alt={name}
       loading="lazy"
       referrerPolicy="no-referrer"
@@ -296,7 +303,7 @@ export default function App() {
     const place = placesRef.current.find((p) => p.id === activePlaceId) ?? placesRef.current[0]
     if (!place || healedPlaces.current.has(place.id)) return
     healedPlaces.current.add(place.id) // mark up front so re-renders don't re-enter
-    const needs = place.foods.filter((f) => !f.image || f.image.includes('images.unsplash.com'))
+    const needs = place.foods.filter((f) => needsImage(f.image))
     if (!needs.length) return
     let cancelled = false
     ;(async () => {
