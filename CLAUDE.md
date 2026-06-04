@@ -9,8 +9,13 @@ what to eat. The centerpiece is an interactive **Decision Wheel**: add your food
 options, spin the wheel, and a winner is chosen at random with a celebratory modal.
 The app also keeps a persistent **dinner history** log of past spins.
 
+Food options are organized into **location profiles** ("places" like Home, Mall, Work),
+each with its own menu. The user switches places manually, or taps "use my location" to
+auto-switch to the nearest place they've pinned via GPS.
+
 The entire app currently lives in a single component, `src/App.jsx`. State is held in
-React `useState` and mirrored to `localStorage` so the menu and history survive refreshes.
+React `useState` and mirrored to `localStorage` so places, menus, and history survive
+refreshes.
 
 ## Tech Stack
 
@@ -82,20 +87,34 @@ Key pieces, all in one file:
 - **Food data** — each food is `{ id, name, image }`. `imageForFood(name, size)` maps a
   food name to a crisp Unsplash photo: it looks the keyword up in `FOOD_PHOTO_IDS`, falls
   back to a rotating pool (`FALLBACK_PHOTO_IDS`) keyed by a stable string hash, and appends
-  `&sig=` to vary fallbacks. `makeFood(name)` builds a food object with a unique id.
-- **Persistence** — `foods` and `history` load from `localStorage` (`wfd-foods`,
-  `wfd-history`) via `loadState()` and are written back in `useEffect`s.
+  `&sig=` to vary fallbacks. `makeFood(name)` builds a food object with a unique id (`uid()`).
+- **Places (location profiles)** — a place is
+  `{ id, name, emoji, coords: {lat,lng}|null, foods: [...] }`. `makePlace(name, emoji,
+  foodNames)` builds one. State is `places` + `activePlaceId`; the active place's foods feed
+  the wheel/menu. `updateActivePlaceFoods(updater)` is the single path for editing the
+  current menu. Add/edit/delete places via the place modal (`placeModal` state); at least one
+  place is always kept.
+- **Geolocation** — `withPosition()` wraps `navigator.geolocation.getCurrentPosition` with
+  permission/timeout handling. "📌 Pin here" stores the current `coords` on the active place;
+  "📍 Use my location" finds the nearest pinned place within `GEO_RADIUS_M` (250 m) using the
+  `distanceMeters()` haversine helper and auto-switches. **Geolocation only works over HTTPS
+  or localhost** (so: dev server and GitHub Pages, but not a plain-HTTP host).
+- **Persistence** — `{ activePlaceId, places }` loads from `localStorage` key
+  `wfd-places-v1` via `bootstrapPlaces()` (which **migrates** an old flat `wfd-foods` list
+  into a "Home" place); `history` uses `wfd-history`. Both are written back in `useEffect`s.
 - **The wheel** — rendered with a CSS `conic-gradient` background (one color stop per
   segment from `WHEEL_COLORS`) plus absolutely-positioned, rotated labels. Spinning sets a
   large `rotation` value and a `cubic-bezier(0.1, 0.8, 0.3, 1)` CSS transition; the winner
   is computed up front and the rotation is solved so that segment lands under the top
-  pointer. `onTransitionEnd` (`handleSpinEnd`) reveals the winner and appends to history.
+  pointer. `onTransitionEnd` (`handleSpinEnd`) reveals the winner and appends to history
+  (tagged with the active place).
 - **Winner modal** — overlay celebrating the result with a large Unsplash image; closes on
   backdrop click or the Close button.
 - **Edge cases handled** — empty/whitespace input is rejected, duplicate names (case-
-  insensitive) are blocked, deletion is prevented below 2 items, and spinning is disabled
-  while a spin is in progress or with fewer than 2 options. Transient validation messages
-  auto-clear after a short delay.
+  insensitive, per place) are blocked, deletion is prevented below 2 items, spinning is
+  disabled while a spin is in progress or with fewer than 2 options, and an empty place
+  shows a hint instead of a wheel. Two transient toasts auto-clear: `error` (food/spin
+  validation, by the wheel) and `status` (location feedback, by the location bar).
 
 When adding features, prefer extending these existing helpers over duplicating logic.
 

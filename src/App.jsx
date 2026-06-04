@@ -83,20 +83,69 @@ function imageForFood(name, size = 500) {
   return `https://images.unsplash.com/${photoId}?auto=format&fit=crop&w=${size}&q=80&sig=${hash % 1000}`
 }
 
+function uid(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
 function makeFood(name) {
   const clean = name.trim()
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    name: clean,
-    image: imageForFood(clean),
-  }
+  return { id: uid('food'), name: clean, image: imageForFood(clean) }
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Defaults & persistence                                                    */
+/*  Places (location profiles)                                                */
 /* -------------------------------------------------------------------------- */
-const DEFAULT_FOODS = ['Pizza', 'Sushi', 'Burgers', 'Tacos', 'Thai'].map(makeFood)
+// A "place" is a named location with its own food list and an optional pinned
+// GPS coordinate used for the "use my location" auto-switch.
+function makePlace(name, emoji, foodNames = []) {
+  return {
+    id: uid('place'),
+    name: name.trim(),
+    emoji,
+    coords: null, // { lat, lng } once the user pins it
+    foods: foodNames.map(makeFood),
+  }
+}
 
+const EMOJI_CHOICES = ['🏠', '🛍️', '💼', '🏖️', '✈️', '🎬', '🏟️', '🏞️', '🎓', '☕', '🍽️', '🎉']
+
+// Build the initial places, migrating any pre-existing flat `wfd-foods` list
+// into a "Home" place so returning users keep their menu.
+function bootstrapPlaces() {
+  const saved = loadState('wfd-places-v1', null)
+  if (saved && Array.isArray(saved.places) && saved.places.length) return saved
+
+  const home = makePlace('Home', '🏠')
+  const oldFoods = loadState('wfd-foods', null)
+  home.foods =
+    Array.isArray(oldFoods) && oldFoods.length
+      ? oldFoods
+      : ['Pizza', 'Sushi', 'Burgers', 'Tacos', 'Thai'].map(makeFood)
+
+  const mall = makePlace('Mall', '🛍️', ['Burgers', 'Ramen', 'Sushi', 'Pizza', 'Dumplings'])
+  const work = makePlace('Work', '💼', ['Salad', 'Sandwich', 'Curry', 'Noodles'])
+
+  return { activePlaceId: home.id, places: [home, mall, work] }
+}
+
+// Haversine distance in metres between two { lat, lng } points.
+function distanceMeters(a, b) {
+  const R = 6371000
+  const toRad = (d) => (d * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const lat1 = toRad(a.lat)
+  const lat2 = toRad(b.lat)
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(h))
+}
+
+const GEO_RADIUS_M = 250 // how close you must be to auto-switch to a pinned place
+
+/* -------------------------------------------------------------------------- */
+/*  Misc                                                                      */
+/* -------------------------------------------------------------------------- */
 // Appetizing wheel palette — warm + vibrant, cycles per segment.
 const WHEEL_COLORS = [
   '#f59e0b', '#f43f5e', '#10b981', '#3b82f6', '#8b5cf6',
@@ -118,31 +167,52 @@ function loadState(key, fallback) {
 /*  App                                                                       */
 /* -------------------------------------------------------------------------- */
 export default function App() {
-  const [foods, setFoods] = useState(() => loadState('wfd-foods', DEFAULT_FOODS))
+  // Load places once — the lazy initializer runs bootstrapPlaces a single time,
+  // so both states derive from the same generated id set.
+  const [boot] = useState(bootstrapPlaces)
+  const [places, setPlaces] = useState(boot.places)
+  const [activePlaceId, setActivePlaceId] = useState(boot.activePlaceId)
   const [history, setHistory] = useState(() => loadState('wfd-history', []))
+
   const [input, setInput] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState('') // food/spin validation (shown by the wheel)
+  const [status, setStatus] = useState('') // location feedback (shown by the location bar)
+  const [locating, setLocating] = useState(false)
+  const [placeModal, setPlaceModal] = useState(null) // { mode:'add'|'edit', id?, name, emoji }
 
   const [rotation, setRotation] = useState(0)
   const [isSpinning, setIsSpinning] = useState(false)
   const [winner, setWinner] = useState(null) // food object once spin resolves
   const winnerIndexRef = useRef(null)
 
-  // Persist to localStorage.
+  /* ------------------------------ Persistence ----------------------------- */
   useEffect(() => {
-    localStorage.setItem('wfd-foods', JSON.stringify(foods))
-  }, [foods])
+    // Persist a valid active id even if the current one was just deleted.
+    const validId = places.some((p) => p.id === activePlaceId) ? activePlaceId : places[0]?.id
+    localStorage.setItem('wfd-places-v1', JSON.stringify({ activePlaceId: validId, places }))
+  }, [places, activePlaceId])
   useEffect(() => {
     localStorage.setItem('wfd-history', JSON.stringify(history))
   }, [history])
 
-  // Clear transient error after a moment.
+  // Auto-clear transient toasts.
   useEffect(() => {
     if (!error) return
     const t = setTimeout(() => setError(''), 2500)
     return () => clearTimeout(t)
   }, [error])
+  useEffect(() => {
+    if (!status) return
+    const t = setTimeout(() => setStatus(''), 3500)
+    return () => clearTimeout(t)
+  }, [status])
 
+  /* ------------------------------- Derived -------------------------------- */
+  const activePlace = useMemo(
+    () => places.find((p) => p.id === activePlaceId) ?? places[0],
+    [places, activePlaceId],
+  )
+  const foods = useMemo(() => activePlace?.foods ?? [], [activePlace])
   const segAngle = useMemo(() => 360 / Math.max(foods.length, 1), [foods.length])
 
   // conic-gradient background for the wheel slices.
@@ -158,6 +228,12 @@ export default function App() {
   }, [foods, segAngle])
 
   /* ----------------------------- Food actions ---------------------------- */
+  function updateActivePlaceFoods(updater) {
+    setPlaces((prev) =>
+      prev.map((p) => (p.id === activePlace.id ? { ...p, foods: updater(p.foods) } : p)),
+    )
+  }
+
   function handleAddFood(e) {
     e.preventDefault()
     const name = input.trim()
@@ -165,12 +241,11 @@ export default function App() {
       setError('Please type a food name first.')
       return
     }
-    const exists = foods.some((f) => f.name.toLowerCase() === name.toLowerCase())
-    if (exists) {
-      setError(`"${name}" is already on the menu.`)
+    if (foods.some((f) => f.name.toLowerCase() === name.toLowerCase())) {
+      setError(`"${name}" is already on ${activePlace.name}'s menu.`)
       return
     }
-    setFoods((prev) => [...prev, makeFood(name)])
+    updateActivePlaceFoods((list) => [...list, makeFood(name)])
     setInput('')
     setError('')
   }
@@ -180,7 +255,99 @@ export default function App() {
       setError('Keep at least 2 options to spin.')
       return
     }
-    setFoods((prev) => prev.filter((f) => f.id !== id))
+    updateActivePlaceFoods((list) => list.filter((f) => f.id !== id))
+  }
+
+  /* ----------------------------- Place actions --------------------------- */
+  function switchPlace(id) {
+    if (isSpinning) return
+    setActivePlaceId(id)
+    setError('')
+  }
+
+  function openAddPlace() {
+    setPlaceModal({ mode: 'add', name: '', emoji: '🍽️' })
+  }
+  function openEditPlace() {
+    setPlaceModal({ mode: 'edit', id: activePlace.id, name: activePlace.name, emoji: activePlace.emoji })
+  }
+  function savePlace() {
+    const name = placeModal.name.trim()
+    if (!name) return
+    if (placeModal.mode === 'add') {
+      const place = makePlace(name, placeModal.emoji)
+      setPlaces((prev) => [...prev, place])
+      setActivePlaceId(place.id)
+    } else {
+      setPlaces((prev) =>
+        prev.map((p) => (p.id === placeModal.id ? { ...p, name, emoji: placeModal.emoji } : p)),
+      )
+    }
+    setPlaceModal(null)
+  }
+  function deletePlace() {
+    if (places.length <= 1) return
+    setPlaces((prev) => prev.filter((p) => p.id !== placeModal.id))
+    setPlaceModal(null)
+  }
+  function clearPin() {
+    setPlaces((prev) => prev.map((p) => (p.id === placeModal.id ? { ...p, coords: null } : p)))
+  }
+
+  /* ----------------------------- Geolocation ----------------------------- */
+  function withPosition(onOk) {
+    if (!('geolocation' in navigator)) {
+      setStatus('⚠️ Location isn’t available on this device.')
+      return
+    }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false)
+        onOk({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+      },
+      (err) => {
+        setLocating(false)
+        setStatus(
+          err.code === err.PERMISSION_DENIED
+            ? '⚠️ Location permission denied.'
+            : '⚠️ Couldn’t get your location.',
+        )
+      },
+      { enableHighAccuracy: true, timeout: 8000 },
+    )
+  }
+
+  function handleUseLocation() {
+    withPosition((here) => {
+      const pinned = places.filter((p) => p.coords)
+      if (!pinned.length) {
+        setStatus('No places pinned yet — use 📌 Pin here to save this spot.')
+        return
+      }
+      let nearest = null
+      let best = Infinity
+      for (const p of pinned) {
+        const d = distanceMeters(here, p.coords)
+        if (d < best) {
+          best = d
+          nearest = p
+        }
+      }
+      if (nearest && best <= GEO_RADIUS_M) {
+        setActivePlaceId(nearest.id)
+        setStatus(`📍 Switched to ${nearest.emoji} ${nearest.name}`)
+      } else {
+        setStatus(`No saved place within ${GEO_RADIUS_M}m — 📌 Pin here to save it.`)
+      }
+    })
+  }
+
+  function handlePinHere() {
+    withPosition((here) => {
+      setPlaces((prev) => prev.map((p) => (p.id === activePlace.id ? { ...p, coords: here } : p)))
+      setStatus(`📌 Pinned ${activePlace.emoji} ${activePlace.name} to your location.`)
+    })
   }
 
   /* -------------------------------- Spin --------------------------------- */
@@ -211,26 +378,94 @@ export default function App() {
     const win = foods[idx]
     setWinner(win)
     setHistory((prev) => [
-      { id: `${Date.now()}`, name: win.name, image: win.image, time: Date.now() },
+      {
+        id: uid('hist'),
+        name: win.name,
+        image: win.image,
+        time: Date.now(),
+        place: { name: activePlace.name, emoji: activePlace.emoji },
+      },
       ...prev,
     ])
   }
 
   const canSpin = foods.length >= 2 && !isSpinning
+  const editingPlace = placeModal?.id ? places.find((p) => p.id === placeModal.id) : null
 
   /* -------------------------------------------------------------------------- */
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-neutral-950 text-slate-100">
-      <div className="mx-auto flex max-w-2xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
+      <div className="mx-auto flex max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
         {/* Header */}
         <header className="text-center">
           <h1 className="bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl">
             What&apos;s for Dinner?
           </h1>
           <p className="mt-3 text-sm text-slate-400 sm:text-base">
-            Can&apos;t decide? Give the wheel a spin and let fate plate your dinner. 🍽️
+            Pick a place, spin the wheel, and let fate plate your dinner. 🍽️
           </p>
         </header>
+
+        {/* Place selector */}
+        <section className="-mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {places.map((p) => {
+              const active = p.id === activePlace.id
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => switchPlace(p.id)}
+                  className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all duration-300 ${
+                    active
+                      ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg shadow-orange-500/25'
+                      : 'bg-white/5 text-slate-300 ring-1 ring-white/10 hover:bg-white/10'
+                  }`}
+                >
+                  <span>{p.emoji}</span>
+                  <span>{p.name}</span>
+                  {p.coords && <span title="Location pinned">📍</span>}
+                </button>
+              )
+            })}
+            <button
+              onClick={openEditPlace}
+              aria-label="Edit current place"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+            >
+              ✎
+            </button>
+            <button
+              onClick={openAddPlace}
+              aria-label="Add a place"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-lg text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+            >
+              ＋
+            </button>
+          </div>
+
+          {/* Location bar */}
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <button
+              onClick={handleUseLocation}
+              disabled={locating}
+              className="rounded-full bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10 disabled:opacity-60"
+            >
+              {locating ? '… Locating' : '📍 Use my location'}
+            </button>
+            <button
+              onClick={handlePinHere}
+              disabled={locating}
+              className="rounded-full bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10 disabled:opacity-60"
+            >
+              📌 Pin here
+            </button>
+          </div>
+          {status && (
+            <p className="animate-fade-in mt-3 text-center text-sm font-medium text-amber-300">
+              {status}
+            </p>
+          )}
+        </section>
 
         {/* Wheel */}
         <section className="flex flex-col items-center">
@@ -268,6 +503,12 @@ export default function App() {
                   )
                 })}
 
+                {foods.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center px-10 text-center text-sm text-slate-400">
+                    Add some food below to fill the wheel
+                  </div>
+                )}
+
                 {/* Subtle inner sheen */}
                 <div className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-inset ring-white/10" />
               </div>
@@ -292,7 +533,9 @@ export default function App() {
 
         {/* Food management */}
         <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10 backdrop-blur sm:p-6">
-          <h2 className="mb-4 text-lg font-bold text-slate-100">Your Menu</h2>
+          <h2 className="mb-4 text-lg font-bold text-slate-100">
+            {activePlace.emoji} {activePlace.name} — Menu
+          </h2>
 
           <form onSubmit={handleAddFood} className="flex gap-2">
             <input
@@ -358,7 +601,14 @@ export default function App() {
                     className="h-14 w-14 shrink-0 rounded-xl object-cover"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-slate-100">{entry.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate font-semibold text-slate-100">{entry.name}</p>
+                      {entry.place && (
+                        <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-300">
+                          {entry.place.emoji} {entry.place.name}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-400">
                       {new Date(entry.time).toLocaleString(undefined, {
                         weekday: 'short',
@@ -409,6 +659,90 @@ export default function App() {
                 className="mt-6 w-full rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-3 font-bold text-white shadow-lg shadow-orange-500/30 transition-all duration-300 hover:scale-[1.02] active:scale-95"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / edit place modal */}
+      {placeModal && (
+        <div
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={() => setPlaceModal(null)}
+        >
+          <div
+            className="animate-pop-in w-full max-w-sm rounded-3xl bg-slate-900 p-6 shadow-2xl ring-1 ring-white/15"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-4 text-xl font-bold text-white">
+              {placeModal.mode === 'add' ? 'New place' : 'Edit place'}
+            </h3>
+
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+              Name
+            </label>
+            <input
+              type="text"
+              autoFocus
+              value={placeModal.name}
+              onChange={(e) => setPlaceModal((m) => ({ ...m, name: e.target.value }))}
+              onKeyDown={(e) => e.key === 'Enter' && savePlace()}
+              placeholder="e.g. Gym, Beach, Downtown"
+              className="w-full rounded-xl border-0 bg-slate-800/80 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+
+            <label className="mb-2 mt-4 block text-xs font-medium uppercase tracking-wide text-slate-400">
+              Icon
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {EMOJI_CHOICES.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => setPlaceModal((m) => ({ ...m, emoji }))}
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl transition-all duration-200 ${
+                    placeModal.emoji === emoji
+                      ? 'bg-amber-400/20 ring-2 ring-amber-400'
+                      : 'bg-slate-800/80 ring-1 ring-white/10 hover:bg-slate-700/80'
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
+            {editingPlace?.coords && (
+              <button
+                onClick={clearPin}
+                className="mt-4 text-sm font-medium text-rose-300 hover:text-rose-200"
+              >
+                📍 Clear pinned location
+              </button>
+            )}
+
+            <div className="mt-6 flex items-center gap-2">
+              <button
+                onClick={savePlace}
+                disabled={!placeModal.name.trim()}
+                className="flex-1 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-500/25 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+              >
+                Save
+              </button>
+              {placeModal.mode === 'edit' && (
+                <button
+                  onClick={deletePlace}
+                  disabled={places.length <= 1}
+                  title={places.length <= 1 ? 'Keep at least one place' : 'Delete place'}
+                  className="rounded-xl bg-rose-500/15 px-4 py-3 font-bold text-rose-300 ring-1 ring-rose-500/30 transition-all duration-300 hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Delete
+                </button>
+              )}
+              <button
+                onClick={() => setPlaceModal(null)}
+                className="rounded-xl bg-white/5 px-4 py-3 font-medium text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+              >
+                Cancel
               </button>
             </div>
           </div>

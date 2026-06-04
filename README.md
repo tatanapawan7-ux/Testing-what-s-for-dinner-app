@@ -7,9 +7,11 @@ a celebratory winner modal and a persistent history of past spins.
 ## Features
 
 - 🎡 **Interactive decision wheel** with smooth, eased spin animation
-- ➕ **Menu management** — add/remove dishes, each with an auto-matched food photo
+- 📍 **Location profiles** — separate menus per place (Home, Mall, Work…), with optional
+  GPS "use my location" auto-switch to the nearest place you've pinned
+- ➕ **Menu management** — add/remove dishes per place, each with an auto-matched food photo
 - 🎉 **Winner modal** announcing tonight's dinner with a large image
-- 🕑 **Dinner history** timeline, persisted in `localStorage`
+- 🕑 **Dinner history** timeline (tagged by place), persisted in `localStorage`
 - 📱 Responsive, mobile-first UI built with Tailwind CSS
 
 ## Tech Stack
