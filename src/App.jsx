@@ -84,6 +84,43 @@ function imageForFood(name, size = 500) {
   return `https://images.unsplash.com/${photoId}?auto=format&fit=crop&w=${size}&q=80&sig=${hash % 1000}`
 }
 
+// A guaranteed-to-render inline SVG, used whenever a remote photo fails to load
+// (dead id, rate-limited/hotlinked thumbnail, offline) so the UI never shows a
+// broken-image icon.
+function placeholderImage(name) {
+  const safe = (name || 'Food').slice(0, 16).replace(/[<>&]/g, '')
+  const hue = hashString(name || 'food') % 360
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">` +
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+    `<stop offset="0" stop-color="hsl(${hue},60%,45%)"/>` +
+    `<stop offset="1" stop-color="hsl(${(hue + 35) % 360},60%,32%)"/>` +
+    `</linearGradient></defs>` +
+    `<rect width="400" height="400" fill="url(#g)"/>` +
+    `<text x="200" y="215" font-family="system-ui,sans-serif" font-size="36" font-weight="bold" fill="white" text-anchor="middle">${safe}</text>` +
+    `</svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
+// Food <img> that falls back to a placeholder on error and avoids hotlink
+// blocks via a no-referrer policy.
+function FoodImage({ name, src, className }) {
+  return (
+    <img
+      src={src || placeholderImage(name)}
+      alt={name}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      className={className}
+      onError={(e) => {
+        if (e.currentTarget.dataset.fb) return
+        e.currentTarget.dataset.fb = '1'
+        e.currentTarget.src = placeholderImage(name)
+      }}
+    />
+  )
+}
+
 function uid(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
@@ -712,10 +749,9 @@ export default function App() {
                 key={food.id}
                 className="group animate-fade-in relative overflow-hidden rounded-2xl bg-slate-800/60 ring-1 ring-white/10 transition-all duration-300 hover:ring-amber-400/50"
               >
-                <img
+                <FoodImage
+                  name={food.name}
                   src={food.image}
-                  alt={food.name}
-                  loading="lazy"
                   className="h-24 w-full object-cover transition-transform duration-300 group-hover:scale-105 sm:h-28"
                 />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2">
@@ -747,10 +783,9 @@ export default function App() {
                   key={entry.id}
                   className="animate-fade-in flex items-start gap-4 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
                 >
-                  <img
+                  <FoodImage
+                    name={entry.name}
                     src={entry.image}
-                    alt={entry.name}
-                    loading="lazy"
                     className="h-14 w-14 shrink-0 rounded-xl object-cover"
                   />
                   <div className="min-w-0 flex-1">
@@ -820,9 +855,9 @@ export default function App() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="relative h-56 w-full">
-              <img
+              <FoodImage
+                name={winner.name}
                 src={winner.image || imageForFood(winner.name, 800)}
-                alt={winner.name}
                 className="h-full w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent" />
@@ -962,7 +997,18 @@ export default function App() {
                         selected ? 'ring-2 ring-amber-400' : 'ring-1 ring-white/10 hover:ring-white/30'
                       }`}
                     >
-                      <img src={r.thumb} alt={r.title} className="h-full w-full object-cover" />
+                      <img
+                        src={r.thumb}
+                        alt={r.title}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          if (e.currentTarget.dataset.fb) return
+                          e.currentTarget.dataset.fb = '1'
+                          e.currentTarget.src = placeholderImage(photoPicker.name)
+                        }}
+                      />
                       {selected && (
                         <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-xs text-slate-900">
                           ✓

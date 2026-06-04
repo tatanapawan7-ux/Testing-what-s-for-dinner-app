@@ -75,6 +75,9 @@ plus `@import "tailwindcss";` at the top of `src/index.css`. For theming, use a 
   the keyless **Openverse** CC image API for ~8 matches; the user picks one, or "Use default"
   falls back to `imageForFood()`. On network/empty errors it degrades to the default image so
   adding never breaks. (Seeded/migrated foods still use `imageForFood`.)
+- **Image loading** — all food images render through `<FoodImage>`, which sets
+  `referrerPolicy="no-referrer"` (avoids hotlink blocks) and, on load error, swaps to an
+  inline-SVG `placeholderImage(name)` so a dead/blocked photo never shows a broken icon.
 - **Places** = `{ id, name, emoji, coords|null, foods[] }`. State is `places` + `activePlaceId`;
   the active place feeds the wheel/menu. Edit the current menu only via
   `updateActivePlaceFoods()`; add/edit/delete places via the `placeModal` (≥1 place always kept).
