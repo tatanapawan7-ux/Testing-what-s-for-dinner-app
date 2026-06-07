@@ -95,10 +95,15 @@ The body sets the cream background, ambient radial glows (`body::before`) and a 
   HTTPS or localhost** (dev + GitHub Pages, not plain HTTP).
 - **Persistence** — `{ activePlaceId, places }` → `localStorage` key `wfd-places-v1` via
   `bootstrapPlaces()` (migrates an old flat `wfd-foods` list into a "Home" place); history →
-  `wfd-history`.
+  `wfd-history`; spin prefs → `wfd-muted`, `wfd-variety`, `wfd-knockout`, `wfd-round`.
 - **Wheel** — CSS `conic-gradient` slices + rotated labels; spin sets a large `rotation` with a
   `cubic-bezier(0.1, 0.8, 0.3, 1)` transition solved so the precomputed winner lands under the
-  top pointer. `handleSpinEnd` reveals the winner and logs history (tagged with the place), then
+  top pointer. **Smarter picking** (`handleSpin`): builds an eligible index pool — excludes the
+  immediate previous winner (`lastWinnerId`), and, in **knock-out** mode, foods already in
+  `roundWon` (cleared by `resetRound`); then picks uniformly or, when **variety** is on, via
+  `weightedPick()` (recency-weighted from `history`). Two toggles + a round status sit under the
+  wheel; the winner modal has a **Spin again** (`spinAgain`). `handleSpinEnd` reveals the winner
+  and logs history (tagged with the place), then
   celebrates: `celebrate()` fires a `canvas-confetti` burst (skipped under `prefers-reduced-motion`)
   and `playFanfare()` plays a Web Audio chime — gated by the persisted mute toggle (`wfd-muted`).
 - **Spin sounds** (Web Audio, no assets) — `playWhoosh()` on launch, then `startTicking()` runs a

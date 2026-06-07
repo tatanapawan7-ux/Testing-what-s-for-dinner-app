@@ -279,6 +279,24 @@ function readWheelAngle(el) {
   return deg
 }
 
+// Recency-weighted pick over candidate food indices: dishes appearing recently
+// in `historyNames` (lowercased, newest first) get lower weight, so the wheel
+// favours variety. Never-recent dishes get the highest weight.
+function weightedPick(pool, foods, historyNames) {
+  const recent = historyNames.slice(0, 30)
+  const weights = pool.map((i) => {
+    const idx = recent.indexOf(foods[i].name.toLowerCase())
+    return idx === -1 ? recent.length + 1 : idx + 1
+  })
+  const total = weights.reduce((a, b) => a + b, 0)
+  let r = Math.random() * total
+  for (let k = 0; k < pool.length; k++) {
+    r -= weights[k]
+    if (r <= 0) return pool[k]
+  }
+  return pool[pool.length - 1]
+}
+
 /* -------------------------------------------------------------------------- */
 /*  App                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -300,6 +318,12 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(null) // food pending removal
   const [muted, setMuted] = useState(() => loadState('wfd-muted', false))
 
+  // Smarter spinning
+  const [variety, setVariety] = useState(() => loadState('wfd-variety', true))
+  const [knockout, setKnockout] = useState(() => loadState('wfd-knockout', false))
+  const [roundWon, setRoundWon] = useState(() => loadState('wfd-round', [])) // food ids won this round
+  const lastWinnerId = useRef(null)
+
   const [rotation, setRotation] = useState(0)
   const [isSpinning, setIsSpinning] = useState(false)
   const [winner, setWinner] = useState(null) // food object once spin resolves
@@ -319,6 +343,15 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('wfd-muted', JSON.stringify(muted))
   }, [muted])
+  useEffect(() => {
+    localStorage.setItem('wfd-variety', JSON.stringify(variety))
+  }, [variety])
+  useEffect(() => {
+    localStorage.setItem('wfd-knockout', JSON.stringify(knockout))
+  }, [knockout])
+  useEffect(() => {
+    localStorage.setItem('wfd-round', JSON.stringify(roundWon))
+  }, [roundWon])
 
   // Auto-clear transient toasts.
   useEffect(() => {
@@ -608,7 +641,18 @@ export default function App() {
     // Resume the audio context on this user gesture so the win chime can play.
     if (!muted) getAudioContext()?.resume?.()
 
-    const winnerIndex = Math.floor(Math.random() * foods.length)
+    // Build the eligible pool, then pick the winner.
+    let pool = foods.map((_, i) => i)
+    if (knockout) pool = pool.filter((i) => !roundWon.includes(foods[i].id))
+    if (pool.length === 0) return // round complete (spin is disabled, but guard anyway)
+    // Avoid repeating the immediately previous winner when there's an alternative.
+    if (pool.length > 1 && lastWinnerId.current) {
+      const filtered = pool.filter((i) => foods[i].id !== lastWinnerId.current)
+      if (filtered.length) pool = filtered
+    }
+    const winnerIndex = variety
+      ? weightedPick(pool, foods, history.map((h) => h.name.toLowerCase()))
+      : pool[Math.floor(Math.random() * pool.length)]
     winnerIndexRef.current = winnerIndex
 
     // Land the winning segment's centre under the top pointer (0deg).
@@ -637,6 +681,8 @@ export default function App() {
     const idx = winnerIndexRef.current
     if (idx == null || !foods[idx]) return
     const win = foods[idx]
+    lastWinnerId.current = win.id
+    if (knockout) setRoundWon((prev) => (prev.includes(win.id) ? prev : [...prev, win.id]))
     setWinner(win)
     celebrate()
     if (!muted) playFanfare()
@@ -652,6 +698,17 @@ export default function App() {
     ])
   }
 
+  // Close the winner and immediately spin again.
+  function spinAgain() {
+    setWinner(null)
+    setTimeout(() => handleSpin(), 120)
+  }
+  // Knock-out: clear the active place's foods from the won-this-round set.
+  function resetRound() {
+    const ids = new Set(foods.map((f) => f.id))
+    setRoundWon((prev) => prev.filter((id) => !ids.has(id)))
+  }
+
   /* ----------------------------- History actions ------------------------- */
   // Record whether the user actually went and ate the suggested dinner.
   // Tapping the already-selected status clears it back to "pending".
@@ -665,7 +722,9 @@ export default function App() {
     )
   }
 
-  const canSpin = foods.length >= 2 && !isSpinning
+  const roundComplete = knockout && foods.length > 0 && foods.every((f) => roundWon.includes(f.id))
+  const remaining = knockout ? foods.filter((f) => !roundWon.includes(f.id)).length : 0
+  const canSpin = foods.length >= 2 && !isSpinning && !roundComplete
   const editingPlace = placeModal?.id ? places.find((p) => p.id === placeModal.id) : null
 
   /* -------------------------------------------------------------------------- */
@@ -820,7 +879,7 @@ export default function App() {
                 canSpin ? 'animate-glow-pulse' : ''
               }`}
             >
-              {isSpinning ? '…' : 'Spin'}
+              {isSpinning ? '…' : roundComplete ? 'Done' : 'Spin'}
             </button>
           </div>
 
@@ -828,6 +887,61 @@ export default function App() {
             <p className="animate-fade-in mt-6 rounded-full bg-red-50 px-4 py-2 text-sm font-medium text-red-700 ring-1 ring-red-200">
               {error}
             </p>
+          )}
+
+          {/* Smarter-spin settings */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            <button
+              onClick={() => setVariety((v) => !v)}
+              aria-pressed={variety}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
+                variety
+                  ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)]'
+                  : 'border border-line bg-white text-ink/70 shadow-sm hover:border-terra/40'
+              }`}
+            >
+              ✨ Favor variety
+            </button>
+            <button
+              onClick={() => setKnockout((k) => !k)}
+              aria-pressed={knockout}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
+                knockout
+                  ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)]'
+                  : 'border border-line bg-white text-ink/70 shadow-sm hover:border-terra/40'
+              }`}
+            >
+              🎯 Knock-out
+            </button>
+          </div>
+          {knockout && (
+            <div className="mt-3 flex items-center justify-center gap-3 text-sm text-muted">
+              {roundComplete ? (
+                <>
+                  <span className="font-medium text-terra">Round complete — everything’s been picked!</span>
+                  <button
+                    onClick={resetRound}
+                    className="rounded-full border border-line bg-white px-3 py-1 font-medium text-ink/80 shadow-sm transition-all duration-300 hover:border-terra/40"
+                  >
+                    ↺ Reset round
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span>
+                    {remaining} of {foods.length} left this round
+                  </span>
+                  {remaining < foods.length && (
+                    <button
+                      onClick={resetRound}
+                      className="rounded-full border border-line bg-white px-3 py-1 font-medium text-ink/80 shadow-sm transition-all duration-300 hover:border-terra/40"
+                    >
+                      ↺ Reset
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </section>
 
@@ -855,16 +969,25 @@ export default function App() {
           </form>
 
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {foods.map((food) => (
+            {foods.map((food) => {
+              const picked = knockout && roundWon.includes(food.id)
+              return (
               <div
                 key={food.id}
-                className="group animate-fade-in relative overflow-hidden rounded-2xl border border-line bg-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+                className={`group animate-fade-in relative overflow-hidden rounded-2xl border border-line bg-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${
+                  picked ? 'opacity-55' : ''
+                }`}
               >
                 <FoodImage
                   name={food.name}
                   src={food.image}
                   className="h-24 w-full object-cover transition-transform duration-300 group-hover:scale-105 sm:h-28"
                 />
+                {picked && (
+                  <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-terra shadow-sm">
+                    ✓ picked
+                  </span>
+                )}
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 py-2">
                   <span className="text-sm font-semibold text-white drop-shadow">{food.name}</span>
                 </div>
@@ -876,7 +999,8 @@ export default function App() {
                   ✕
                 </button>
               </div>
-            ))}
+              )
+            })}
           </div>
         </section>
 
@@ -980,12 +1104,26 @@ export default function App() {
               <h3 className="mt-1.5 font-display text-4xl font-bold tracking-tight text-ink">
                 {winner.name}!
               </h3>
-              <button
-                onClick={() => setWinner(null)}
-                className="mt-6 w-full rounded-xl bg-gradient-to-br from-terra to-terra-light px-6 py-3 font-semibold text-white shadow-[0_10px_26px_-8px_rgba(194,99,47,0.55)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
-              >
-                Close
-              </button>
+              <div className="mt-6 flex items-center gap-2">
+                {!roundComplete && (
+                  <button
+                    onClick={spinAgain}
+                    className="flex-1 rounded-xl bg-gradient-to-br from-terra to-terra-light px-5 py-3 font-semibold text-white shadow-[0_10px_26px_-8px_rgba(194,99,47,0.55)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  >
+                    🎡 Spin again
+                  </button>
+                )}
+                <button
+                  onClick={() => setWinner(null)}
+                  className={`rounded-xl px-5 py-3 font-medium transition-all duration-300 active:scale-95 ${
+                    roundComplete
+                      ? 'flex-1 bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_10px_26px_-8px_rgba(194,99,47,0.55)] hover:-translate-y-0.5'
+                      : 'border border-line bg-cream text-ink/70 hover:bg-line/40'
+                  }`}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
