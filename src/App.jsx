@@ -74,25 +74,76 @@ function makeFood(name, image) {
   return { id: uid('food'), name: clean, image: image ?? null }
 }
 
-// Search Openverse (Creative-Commons image search, no API key) for matching
-// food photos. Returns [{ id, thumb, title }]; throws on network/HTTP errors so
-// callers can fall back to a placeholder.
-async function searchFoodImages(query, count = 6) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 8000)
+// --- Food photo search (no API key) ---
+// Results are { id, thumb (grid preview), full (stored/display image), title }.
+
+// TheMealDB — real food photography for common dishes (CORS-enabled, hotlink-ok).
+async function searchMealDb(query) {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), 8000)
+  try {
+    const res = await fetch(
+      `https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(query)}`,
+      { signal: ctrl.signal },
+    )
+    if (!res.ok) throw new Error(`MealDB HTTP ${res.status}`)
+    const data = await res.json()
+    return (data.meals ?? [])
+      .map((m) => ({
+        id: `mdb-${m.idMeal}`,
+        thumb: m.strMealThumb,
+        full: m.strMealThumb,
+        title: m.strMeal || query,
+      }))
+      .filter((r) => r.thumb)
+  } finally {
+    clearTimeout(t)
+  }
+}
+
+// Openverse — Creative-Commons fallback covering anything TheMealDB lacks.
+async function searchOpenverse(query, count) {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), 8000)
   try {
     const url = `https://api.openverse.org/v1/images/?q=${encodeURIComponent(
       query,
     )}&page_size=${count}&mature=false`
-    const res = await fetch(url, { signal: controller.signal })
+    const res = await fetch(url, { signal: ctrl.signal })
     if (!res.ok) throw new Error(`Openverse HTTP ${res.status}`)
     const data = await res.json()
     return (data.results ?? [])
-      .map((r) => ({ id: r.id, thumb: r.thumbnail || r.url, title: r.title || query }))
+      .map((r) => {
+        const url = r.thumbnail || r.url
+        return { id: r.id, thumb: url, full: url, title: r.title || query }
+      })
       .filter((r) => r.thumb)
   } finally {
-    clearTimeout(timer)
+    clearTimeout(t)
   }
+}
+
+// Merge TheMealDB (preferred) + Openverse. Throws only when BOTH fail (network),
+// so callers can tell a true error from an empty result set.
+async function searchFoodImages(query, count = 8) {
+  const [mdb, ov] = await Promise.allSettled([
+    searchMealDb(query),
+    searchOpenverse(query, count),
+  ])
+  if (mdb.status === 'rejected' && ov.status === 'rejected') {
+    throw new Error('photo search failed')
+  }
+  const a = mdb.status === 'fulfilled' ? mdb.value : []
+  const b = ov.status === 'fulfilled' ? ov.value : []
+  const seen = new Set()
+  const merged = []
+  for (const r of [...a, ...b]) {
+    if (!r.thumb || seen.has(r.thumb)) continue
+    seen.add(r.thumb)
+    merged.push(r)
+    if (merged.length >= count) break
+  }
+  return merged
 }
 
 /* -------------------------------------------------------------------------- */
@@ -405,14 +456,15 @@ export default function App() {
         if (cancelled) break
         try {
           const [first] = await searchFoodImages(food.name, 1)
-          if (first?.thumb && !cancelled) {
+          const image = first?.full || first?.thumb
+          if (image && !cancelled) {
             setPlaces((prev) =>
               prev.map((p) =>
                 p.id === place.id
                   ? {
                       ...p,
                       foods: p.foods.map((f) =>
-                        f.id === food.id ? { ...f, image: first.thumb } : f,
+                        f.id === food.id ? { ...f, image } : f,
                       ),
                     }
                   : p,
@@ -437,15 +489,24 @@ export default function App() {
     )
   }
 
-  // Adds a finished food object to the active menu and resets the input.
-  function commitFood(name, image) {
-    updateActivePlaceFoods((list) => [...list, makeFood(name, image)])
-    setInput('')
+  // Open the photo picker for a dish — `editId` set means we're changing an
+  // existing food's photo (not adding a new one). Searches both sources.
+  function openPhotoPicker(name, editId = null) {
     setError('')
-    setPhotoPicker(null)
+    setPhotoPicker({ name, editId, status: 'loading', results: [], selectedId: null, customUrl: '' })
+    const same = (p) => p && p.name === name && p.editId === editId
+    searchFoodImages(name, 8)
+      .then((results) =>
+        setPhotoPicker((p) =>
+          same(p)
+            ? { ...p, status: results.length ? 'ok' : 'empty', results, selectedId: results[0]?.id ?? null }
+            : p,
+        ),
+      )
+      .catch(() => setPhotoPicker((p) => (same(p) ? { ...p, status: 'error' } : p)))
   }
 
-  // Validate the input, then open the photo picker and search Openverse for it.
+  // Validate the input, then open the picker to add a new dish.
   function handleAddFood(e) {
     e.preventDefault()
     const name = input.trim()
@@ -457,30 +518,32 @@ export default function App() {
       setError(`"${name}" is already on ${activePlace.name}'s menu.`)
       return
     }
+    openPhotoPicker(name)
+  }
+
+  // Apply the chosen image — either updating an existing food or adding a new one.
+  function applyPhoto(image) {
+    const pp = photoPicker
+    if (!pp) return
+    if (pp.editId) {
+      updateActivePlaceFoods((list) =>
+        list.map((f) => (f.id === pp.editId ? { ...f, image: image ?? null } : f)),
+      )
+    } else {
+      updateActivePlaceFoods((list) => [...list, makeFood(pp.name, image)])
+      setInput('')
+    }
     setError('')
-    setPhotoPicker({ name, status: 'loading', results: [], selectedId: null })
-    searchFoodImages(name, 8)
-      .then((results) =>
-        setPhotoPicker((p) =>
-          p && p.name === name
-            ? {
-                ...p,
-                status: results.length ? 'ok' : 'empty',
-                results,
-                selectedId: results[0]?.id ?? null,
-              }
-            : p,
-        ),
-      )
-      .catch(() =>
-        setPhotoPicker((p) => (p && p.name === name ? { ...p, status: 'error' } : p)),
-      )
+    setPhotoPicker(null)
   }
 
   function confirmPhoto() {
-    const chosen = photoPicker.results.find((r) => r.id === photoPicker.selectedId)
-    // Fall back to the keyword/hash image if nothing was selectable.
-    commitFood(photoPicker.name, chosen?.thumb)
+    const pp = photoPicker
+    const image =
+      pp.selectedId === 'custom'
+        ? pp.customUrl.trim()
+        : pp.results.find((r) => r.id === pp.selectedId)?.full
+    applyPhoto(image)
   }
 
   // Ask before removing — but keep the min-2 guard up front (no dialog if blocked).
@@ -988,8 +1051,16 @@ export default function App() {
                     ✓ picked
                   </span>
                 )}
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 py-2">
-                  <span className="text-sm font-semibold text-white drop-shadow">{food.name}</span>
+                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/75 to-transparent px-3 py-2">
+                  <span className="truncate text-sm font-semibold text-white drop-shadow">{food.name}</span>
+                  <button
+                    onClick={() => openPhotoPicker(food.name, food.id)}
+                    aria-label={`Change photo for ${food.name}`}
+                    title="Change photo"
+                    className="shrink-0 text-base leading-none opacity-90 transition-opacity duration-300 hover:opacity-100"
+                  >
+                    🖼
+                  </button>
                 </div>
                 <button
                   onClick={() => requestDelete(food)}
@@ -1224,10 +1295,11 @@ export default function App() {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="font-display text-xl font-semibold text-ink">
-              Pick a photo for <span className="text-terra">{photoPicker.name}</span>
+              {photoPicker.editId ? 'Change photo for' : 'Pick a photo for'}{' '}
+              <span className="text-terra">{photoPicker.name}</span>
             </h3>
             <p className="mb-4 mt-1 text-sm text-muted">
-              Tap the one that looks right, then add it to your menu.
+              Tap the one that looks right, or paste your own link below.
             </p>
 
             {photoPicker.status === 'loading' && (
@@ -1276,20 +1348,70 @@ export default function App() {
                 {photoPicker.status === 'error'
                   ? 'Couldn’t reach the photo search.'
                   : `No photos found for "${photoPicker.name}".`}{' '}
-                You can still add it with a default image.
+                Paste a link below, or use a default image.
               </p>
+            )}
+
+            {/* Paste your own image link */}
+            {photoPicker.status !== 'loading' && (
+              <div className="mt-4">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+                  Or paste an image link
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    value={photoPicker.customUrl}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setPhotoPicker((p) => ({
+                        ...p,
+                        customUrl: v,
+                        selectedId: v.trim() ? 'custom' : (p.results[0]?.id ?? null),
+                      }))
+                    }}
+                    placeholder="https://…  (right-click an image → Copy image address)"
+                    className="min-w-0 flex-1 rounded-xl border border-line bg-cream px-3 py-2 text-sm text-ink placeholder-muted/70 focus:border-terra/50 focus:outline-none focus:ring-2 focus:ring-terra/30"
+                  />
+                  {photoPicker.customUrl.trim() && (
+                    <button
+                      onClick={() => setPhotoPicker((p) => ({ ...p, selectedId: 'custom' }))}
+                      aria-label="Use pasted image"
+                      className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-lg transition-all duration-200 ${
+                        photoPicker.selectedId === 'custom' ? 'ring-2 ring-terra' : 'ring-1 ring-line'
+                      }`}
+                    >
+                      <img
+                        src={photoPicker.customUrl.trim()}
+                        alt="preview"
+                        referrerPolicy="no-referrer"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          if (e.currentTarget.dataset.fb) return
+                          e.currentTarget.dataset.fb = '1'
+                          e.currentTarget.src = placeholderImage(photoPicker.name)
+                        }}
+                      />
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
 
             <div className="mt-6 flex items-center gap-2">
               <button
                 onClick={confirmPhoto}
-                disabled={photoPicker.status === 'loading' || photoPicker.selectedId == null}
+                disabled={
+                  photoPicker.status === 'loading' ||
+                  photoPicker.selectedId == null ||
+                  (photoPicker.selectedId === 'custom' && !photoPicker.customUrl.trim())
+                }
                 className="flex-1 rounded-xl bg-gradient-to-br from-terra to-terra-light px-4 py-3 font-semibold text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 disabled:hover:translate-y-0"
               >
-                Add to menu
+                {photoPicker.editId ? 'Save photo' : 'Add to menu'}
               </button>
               <button
-                onClick={() => commitFood(photoPicker.name)}
+                onClick={() => applyPhoto(undefined)}
                 disabled={photoPicker.status === 'loading'}
                 className="rounded-xl border border-line bg-cream px-4 py-3 text-sm font-medium text-ink/70 transition-all duration-300 hover:bg-line/40 disabled:opacity-50"
               >
@@ -1304,7 +1426,7 @@ export default function App() {
             </div>
 
             <p className="mt-3 text-center text-[11px] text-muted/70">
-              Photos via Openverse (Creative Commons)
+              Photos via TheMealDB &amp; Openverse
             </p>
           </div>
         </div>

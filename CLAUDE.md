@@ -74,15 +74,20 @@ The body sets the cream background, ambient radial glows (`body::before`) and a 
 ## Architecture (`src/App.jsx`)
 
 - **Food** = `{ id, name, image }`. `makeFood(name, image?)` builds one with a `uid()`;
-  `image` is `null` until a photo is chosen/fetched. **All food imagery comes from Openverse**
-  (keyless CC search) — there is no curated/Unsplash map anymore.
-- **Adding food** opens a **photo picker** (`photoPicker` state): `searchFoodImages()` queries
-  Openverse for ~8 matches; the user picks one (or "Use default" → `null` image). On
-  network/empty errors it degrades to a placeholder so adding never breaks.
+  `image` is `null` until a photo is chosen/fetched. **No curated/Unsplash map** — all imagery
+  comes from a keyless multi-source search.
+- **Photo search** — `searchFoodImages(q, count)` merges **TheMealDB** (`searchMealDb`, nicer
+  food photos, preferred) then **Openverse** (`searchOpenverse`, CC fallback), deduped; throws
+  only if **both** sources fail. Results are `{ id, thumb, full, title }`.
+- **Photo picker** (`photoPicker` state, opened by `openPhotoPicker(name, editId?)`): pick one of
+  the merged results, **paste your own image link** (`customUrl`, `selectedId:'custom'`), or
+  "Use default" (→ `null`, re-healed). `applyPhoto()` either adds a new food or, when `editId`
+  is set, updates that food's image — the **🖼 button on each menu card** changes its photo.
+  Degrades to a placeholder so it never breaks.
 - **Seeded / legacy foods** start with `image: null`. A heal `useEffect` (keyed on
   `activePlaceId`, one gentle throttled pass per place per session, results persisted) fetches
-  a photo from Openverse for any food that is missing an image (or still has an old
-  `images.unsplash.com` URL from a previous version), so starter menus fill in on first view.
+  a photo via `searchFoodImages(name, 1)` for any food that is missing an image (or still has an
+  old `images.unsplash.com` URL from a previous version), so starter menus fill in on first view.
 - **Image loading** — all food images render through `<FoodImage>`, which sets
   `referrerPolicy="no-referrer"` (avoids hotlink blocks) and, on load error or `null` src,
   shows an inline-SVG `placeholderImage(name)` so a dead/blocked photo never breaks the layout.
