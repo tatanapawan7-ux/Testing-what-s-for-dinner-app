@@ -417,6 +417,20 @@ export default function App() {
     return () => clearTimeout(t)
   }, [status])
 
+  // Close whichever overlay is open on Escape (innermost first).
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key !== 'Escape') return
+      if (photoPicker) setPhotoPicker(null)
+      else if (placeModal) setPlaceModal(null)
+      else if (confirmDelete) setConfirmDelete(null)
+      else if (confirmClearHistory) setConfirmClearHistory(false)
+      else if (winner) setWinner(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [photoPicker, placeModal, confirmDelete, confirmClearHistory, winner])
+
   /* ------------------------------- Derived -------------------------------- */
   const activePlace = useMemo(
     () => places.find((p) => p.id === activePlaceId) ?? places[0],
@@ -805,6 +819,11 @@ export default function App() {
   /* -------------------------------------------------------------------------- */
   return (
     <div className="min-h-screen text-ink">
+      {/* Screen-reader-only announcement of the latest spin result. */}
+      <p className="sr-only" role="status" aria-live="assertive">
+        {winner ? `Tonight's dinner is ${winner.name}` : ''}
+      </p>
+
       <div className="relative mx-auto flex max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
         {/* Sound toggle */}
         <button
@@ -1178,7 +1197,7 @@ export default function App() {
         </section>
 
         <footer className="pb-4 pt-2 text-center text-xs text-muted/70">
-          Built with React + Vite + Tailwind · Photos from Openverse
+          Built with React + Vite + Tailwind · Photos from TheMealDB &amp; Openverse
         </footer>
       </div>
 
@@ -1189,6 +1208,9 @@ export default function App() {
           onClick={() => setWinner(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="winner-title"
             className="animate-pop-in w-full max-w-sm overflow-hidden rounded-3xl border border-line bg-white shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1204,7 +1226,7 @@ export default function App() {
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-terra">
                 🎉 Tonight&apos;s Dinner is
               </p>
-              <h3 className="mt-1.5 font-display text-4xl font-bold tracking-tight text-ink">
+              <h3 id="winner-title" className="mt-1.5 font-display text-4xl font-bold tracking-tight text-ink">
                 {winner.name}!
               </h3>
               <div className="mt-6 flex items-center gap-2">
@@ -1239,10 +1261,13 @@ export default function App() {
           onClick={() => setPlaceModal(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="place-title"
             className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-white p-6 shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-4 font-display text-xl font-semibold text-ink">
+            <h3 id="place-title" className="mb-4 font-display text-xl font-semibold text-ink">
               {placeModal.mode === 'add' ? 'New place' : 'Edit place'}
             </h3>
 
@@ -1323,10 +1348,13 @@ export default function App() {
           onClick={() => setPhotoPicker(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="photo-title"
             className="animate-pop-in w-full max-w-md rounded-3xl border border-line bg-white p-6 shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-display text-xl font-semibold text-ink">
+            <h3 id="photo-title" className="font-display text-xl font-semibold text-ink">
               {photoPicker.editId ? 'Change photo for' : 'Pick a photo for'}{' '}
               <span className="text-terra">{photoPicker.name}</span>
             </h3>
@@ -1471,10 +1499,13 @@ export default function App() {
           onClick={() => setConfirmDelete(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-delete-title"
             className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-white p-6 text-center shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-display text-xl font-semibold text-ink">Remove this dish?</h3>
+            <h3 id="confirm-delete-title" className="font-display text-xl font-semibold text-ink">Remove this dish?</h3>
             <p className="mt-2 text-sm text-muted">
               <span className="font-semibold text-ink">{confirmDelete.name}</span> will be removed
               from {activePlace.emoji} {activePlace.name}.
@@ -1504,10 +1535,13 @@ export default function App() {
           onClick={() => setConfirmClearHistory(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-clear-title"
             className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-white p-6 text-center shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-display text-xl font-semibold text-ink">Clear all history?</h3>
+            <h3 id="confirm-clear-title" className="font-display text-xl font-semibold text-ink">Clear all history?</h3>
             <p className="mt-2 text-sm text-muted">
               This removes all {history.length}{' '}
               {history.length === 1 ? 'entry' : 'entries'} from your dinner history. This can’t be

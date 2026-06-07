@@ -123,6 +123,10 @@ The body sets the cream background, ambient radial glows (`body::before`) and a 
   asks via a confirm dialog (`confirmDelete`) and is blocked below 2 items, spin disabled while
   spinning or under 2 options, empty place shows a hint. Two
   auto-clearing toasts: `error` (validation, by the wheel) and `status` (location, by the bar).
+- **Accessibility** — every modal is a labelled `role="dialog"` (`aria-modal`, `aria-labelledby`)
+  and a window-level Escape handler closes whichever overlay is open (innermost first). The spin
+  winner is announced to screen readers via a visually-hidden (`sr-only`) `aria-live="assertive"`
+  region. Motion is gated on `prefers-reduced-motion` (see Tailwind/CSS notes).
 
 Prefer extending these existing helpers over duplicating logic.
 
