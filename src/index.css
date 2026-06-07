@@ -1,23 +1,70 @@
 @import "tailwindcss";
 
-html {
-  scroll-behavior: smooth;
+@theme {
+  --font-sans: 'Inter Variable', system-ui, -apple-system, sans-serif;
+  --font-display: 'Space Grotesk Variable', 'Inter Variable', system-ui, sans-serif;
+
+  /* Warm "light & cream" palette */
+  --color-cream: #f8f3ec;
+  --color-ink: #2c2520;
+  --color-muted: #7b6f62;
+  --color-line: #ece3d5;
+  --color-terra: #c2632f;
+  --color-terra-light: #d98a4e;
+  --color-sage: #7c8a6a;
+  --color-gold: #e0a458;
 }
 
-/* Custom keyframe for the winner modal pop-in */
+html {
+  scroll-behavior: smooth;
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: #f8f3ec;
+  color: #2c2520;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ambient warm glows for depth (fixed, behind everything). */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(60rem 60rem at 12% -8%, rgba(217, 138, 78, 0.22), transparent 60%),
+    radial-gradient(50rem 50rem at 110% 10%, rgba(124, 138, 106, 0.18), transparent 55%),
+    radial-gradient(55rem 55rem at 50% 115%, rgba(224, 164, 88, 0.16), transparent 60%);
+}
+
+/* Faint grain for a tactile, premium surface. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- Keyframes ---- */
 @keyframes pop-in {
   0% {
     opacity: 0;
-    transform: scale(0.8) translateY(20px);
+    transform: scale(0.9) translateY(16px);
   }
   100% {
     opacity: 1;
     transform: scale(1) translateY(0);
   }
 }
-
 .animate-pop-in {
-  animation: pop-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: pop-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes fade-in {
@@ -28,7 +75,44 @@ html {
     opacity: 1;
   }
 }
-
 .animate-fade-in {
   animation: fade-in 0.25s ease-out forwards;
+}
+
+@keyframes float-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-float-up {
+  opacity: 0;
+  animation: float-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 8px 22px -6px rgba(194, 99, 47, 0.5);
+  }
+  50% {
+    box-shadow: 0 10px 30px -4px rgba(194, 99, 47, 0.85);
+  }
+}
+.animate-glow-pulse {
+  animation: glow-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-up,
+  .animate-glow-pulse,
+  .animate-pop-in,
+  .animate-fade-in {
+    animation: none;
+    opacity: 1;
+  }
 }

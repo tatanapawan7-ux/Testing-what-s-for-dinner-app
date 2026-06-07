@@ -23,12 +23,13 @@ function hashString(str) {
 // broken-image icon.
 function placeholderImage(name) {
   const safe = (name || 'Food').slice(0, 16).replace(/[<>&]/g, '')
-  const hue = hashString(name || 'food') % 360
+  // Warm band (amber → terracotta) so placeholders fit the cream theme.
+  const hue = 14 + (hashString(name || 'food') % 42)
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">` +
     `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
-    `<stop offset="0" stop-color="hsl(${hue},60%,45%)"/>` +
-    `<stop offset="1" stop-color="hsl(${(hue + 35) % 360},60%,32%)"/>` +
+    `<stop offset="0" stop-color="hsl(${hue},58%,52%)"/>` +
+    `<stop offset="1" stop-color="hsl(${hue + 14},52%,38%)"/>` +
     `</linearGradient></defs>` +
     `<rect width="400" height="400" fill="url(#g)"/>` +
     `<text x="200" y="215" font-family="system-ui,sans-serif" font-size="36" font-weight="bold" fill="white" text-anchor="middle">${safe}</text>` +
@@ -148,11 +149,14 @@ const GEO_RADIUS_M = 250 // how close you must be to auto-switch to a pinned pla
 /* -------------------------------------------------------------------------- */
 /*  Misc                                                                      */
 /* -------------------------------------------------------------------------- */
-// Appetizing wheel palette — warm + vibrant, cycles per segment.
+// Curated warm earth/jewel palette — harmonious, premium, cycles per segment.
 const WHEEL_COLORS = [
-  '#f59e0b', '#f43f5e', '#10b981', '#3b82f6', '#8b5cf6',
-  '#ec4899', '#ef4444', '#14b8a6', '#f97316', '#a855f7',
+  '#d2703a', '#e0a458', '#8e9b7c', '#c98b6b',
+  '#a6603c', '#6e8b7b', '#d98e73', '#b08968',
 ]
+
+// Warm confetti to match the cream theme.
+const CONFETTI_COLORS = ['#d2703a', '#e0a458', '#8e9b7c', '#c98b6b', '#a6603c', '#fffdfa']
 
 const SPIN_MS = 4800
 
@@ -181,7 +185,7 @@ const prefersReducedMotion = () =>
 // A short celebratory confetti burst over the winner modal.
 function celebrate() {
   if (prefersReducedMotion()) return
-  const opts = { spread: 70, startVelocity: 45, ticks: 200, zIndex: 100 }
+  const opts = { spread: 70, startVelocity: 45, ticks: 200, zIndex: 100, colors: CONFETTI_COLORS }
   confetti({ ...opts, particleCount: 80, origin: { x: 0.5, y: 0.6 } })
   confetti({ ...opts, particleCount: 40, angle: 60, origin: { x: 0, y: 0.7 } })
   confetti({ ...opts, particleCount: 40, angle: 120, origin: { x: 1, y: 0.7 } })
@@ -666,30 +670,33 @@ export default function App() {
 
   /* -------------------------------------------------------------------------- */
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-neutral-950 text-slate-100">
+    <div className="min-h-screen text-ink">
       <div className="relative mx-auto flex max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
         {/* Sound toggle */}
         <button
           onClick={() => setMuted((m) => !m)}
           aria-label={muted ? 'Unmute sound' : 'Mute sound'}
           title={muted ? 'Sound off' : 'Sound on'}
-          className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10 sm:right-6"
+          className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-base shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:right-6"
         >
           {muted ? '🔇' : '🔊'}
         </button>
 
         {/* Header */}
-        <header className="text-center">
-          <h1 className="bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl">
-            What&apos;s for Dinner?
+        <header className="animate-float-up text-center">
+          <h1 className="font-display text-[2.7rem] font-bold leading-[0.95] tracking-tight text-ink sm:text-6xl">
+            What&apos;s for{' '}
+            <span className="bg-gradient-to-br from-terra to-terra-light bg-clip-text text-transparent">
+              Dinner?
+            </span>
           </h1>
-          <p className="mt-3 text-sm text-slate-400 sm:text-base">
-            Pick a place, spin the wheel, and let fate plate your dinner. 🍽️
+          <p className="mx-auto mt-4 max-w-sm text-sm text-muted sm:text-base">
+            Pick a place, spin the wheel, and let fate plate your dinner.
           </p>
         </header>
 
         {/* Place selector */}
-        <section className="-mx-4 px-4 sm:mx-0 sm:px-0">
+        <section className="-mx-4 animate-float-up px-4 [animation-delay:60ms] sm:mx-0 sm:px-0">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {places.map((p) => {
               const active = p.id === activePlace.id
@@ -699,8 +706,8 @@ export default function App() {
                   onClick={() => switchPlace(p.id)}
                   className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all duration-300 ${
                     active
-                      ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg shadow-orange-500/25'
-                      : 'bg-white/5 text-slate-300 ring-1 ring-white/10 hover:bg-white/10'
+                      ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.55)]'
+                      : 'border border-line bg-white text-ink/70 shadow-sm hover:-translate-y-0.5 hover:border-terra/40 hover:text-ink'
                   }`}
                 >
                   <span>{p.emoji}</span>
@@ -712,14 +719,14 @@ export default function App() {
             <button
               onClick={openEditPlace}
               aria-label="Edit current place"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-white text-ink/60 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
             >
               ✎
             </button>
             <button
               onClick={openAddPlace}
               aria-label="Add a place"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-lg text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-white text-lg text-ink/60 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
             >
               ＋
             </button>
@@ -730,33 +737,40 @@ export default function App() {
             <button
               onClick={handleUseLocation}
               disabled={locating}
-              className="rounded-full bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10 disabled:opacity-60"
+              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink/80 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-terra/40 hover:shadow-md disabled:opacity-60"
             >
               {locating ? '… Locating' : '📍 Use my location'}
             </button>
             <button
               onClick={handlePinHere}
               disabled={locating}
-              className="rounded-full bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10 disabled:opacity-60"
+              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink/80 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-terra/40 hover:shadow-md disabled:opacity-60"
             >
               📌 Pin here
             </button>
           </div>
           {status && (
-            <p className="animate-fade-in mt-3 text-center text-sm font-medium text-amber-300">
+            <p className="animate-fade-in mt-3 text-center text-sm font-medium text-terra">
               {status}
             </p>
           )}
         </section>
 
         {/* Wheel */}
-        <section className="flex flex-col items-center">
+        <section className="flex animate-float-up flex-col items-center [animation-delay:120ms]">
           <div className="relative">
+            {/* Ambient glow behind the wheel (brightens while spinning) */}
+            <div
+              className={`pointer-events-none absolute inset-0 -z-10 rounded-full bg-terra/30 blur-3xl transition-opacity duration-500 ${
+                isSpinning ? 'opacity-90' : 'opacity-50'
+              }`}
+            />
+
             {/* Pointer */}
-            <div className="absolute -top-1 left-1/2 z-20 h-0 w-0 -translate-x-1/2 border-l-[14px] border-r-[14px] border-t-[26px] border-l-transparent border-r-transparent border-t-amber-300 drop-shadow-[0_3px_4px_rgba(0,0,0,0.5)]" />
+            <div className="absolute -top-1.5 left-1/2 z-20 h-0 w-0 -translate-x-1/2 border-l-[15px] border-r-[15px] border-t-[28px] border-l-transparent border-r-transparent border-t-[#2c2520] drop-shadow-[0_3px_5px_rgba(120,80,40,0.45)]" />
 
             {/* Outer ring */}
-            <div className="rounded-full bg-gradient-to-br from-amber-300 to-rose-400 p-1.5 shadow-2xl shadow-rose-500/20 sm:p-2">
+            <div className="rounded-full bg-white p-2.5 shadow-[0_24px_60px_-18px_rgba(120,80,40,0.5)] ring-1 ring-line sm:p-3">
               {/* Spinning disc */}
               <div
                 ref={wheelRef}
@@ -779,7 +793,7 @@ export default function App() {
                       className="pointer-events-none absolute inset-0"
                       style={{ transform: `rotate(${rotate}deg)` }}
                     >
-                      <span className="absolute left-1/2 top-3 max-w-[5.5rem] -translate-x-1/2 truncate text-center text-sm font-bold text-white [text-shadow:_0_1px_3px_rgb(0_0_0_/_70%)] sm:top-5 sm:max-w-[7rem] sm:text-base">
+                      <span className="absolute left-1/2 top-3 max-w-[5.5rem] -translate-x-1/2 truncate text-center text-sm font-bold tracking-wide text-white [text-shadow:_0_1px_3px_rgb(60_36_20_/_55%)] sm:top-5 sm:max-w-[7rem] sm:text-base">
                         {food.name}
                       </span>
                     </div>
@@ -787,13 +801,14 @@ export default function App() {
                 })}
 
                 {foods.length === 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center px-10 text-center text-sm text-slate-400">
+                  <div className="absolute inset-0 flex items-center justify-center px-10 text-center text-sm text-white/90 [text-shadow:_0_1px_2px_rgb(60_36_20_/_45%)]">
                     Add some food below to fill the wheel
                   </div>
                 )}
 
-                {/* Subtle inner sheen */}
-                <div className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-inset ring-white/10" />
+                {/* Glossy sheen + hairline rim */}
+                <div className="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(circle_at_32%_24%,rgba(255,255,255,0.4),transparent_55%)]" />
+                <div className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-inset ring-black/5" />
               </div>
             </div>
 
@@ -801,23 +816,26 @@ export default function App() {
             <button
               onClick={handleSpin}
               disabled={!canSpin}
-              className="absolute left-1/2 top-1/2 z-10 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-white bg-gradient-to-br from-amber-400 to-orange-500 text-base font-black uppercase tracking-wide text-white shadow-lg shadow-black/40 transition-all duration-300 hover:scale-110 hover:shadow-amber-400/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 sm:h-24 sm:w-24 sm:text-lg"
+              className={`absolute left-1/2 top-1/2 z-10 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[5px] border-white bg-gradient-to-br from-terra to-terra-light text-base font-bold uppercase tracking-wider text-white shadow-[0_10px_28px_-6px_rgba(194,99,47,0.6)] transition-all duration-300 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100 sm:h-24 sm:w-24 sm:text-lg ${
+                canSpin ? 'animate-glow-pulse' : ''
+              }`}
             >
               {isSpinning ? '…' : 'Spin'}
             </button>
           </div>
 
           {error && (
-            <p className="animate-fade-in mt-6 rounded-full bg-rose-500/15 px-4 py-2 text-sm font-medium text-rose-300 ring-1 ring-rose-500/30">
+            <p className="animate-fade-in mt-6 rounded-full bg-red-50 px-4 py-2 text-sm font-medium text-red-700 ring-1 ring-red-200">
               {error}
             </p>
           )}
         </section>
 
         {/* Food management */}
-        <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10 backdrop-blur sm:p-6">
-          <h2 className="mb-4 text-lg font-bold text-slate-100">
-            {activePlace.emoji} {activePlace.name} — Menu
+        <section className="animate-float-up rounded-3xl border border-line bg-white p-5 shadow-[0_14px_50px_-22px_rgba(120,80,40,0.28)] [animation-delay:180ms] sm:p-6">
+          <h2 className="mb-4 font-display text-lg font-semibold text-ink">
+            {activePlace.emoji} {activePlace.name}
+            <span className="text-muted"> — Menu</span>
           </h2>
 
           <form onSubmit={handleAddFood} className="flex gap-2">
@@ -826,11 +844,11 @@ export default function App() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Add a dish… e.g. Ramen"
-              className="min-w-0 flex-1 rounded-xl border-0 bg-slate-800/80 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 ring-1 ring-white/10 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-amber-400 sm:text-base"
+              className="min-w-0 flex-1 rounded-xl border border-line bg-cream px-4 py-3 text-sm text-ink placeholder-muted/70 transition-all duration-300 focus:border-terra/50 focus:outline-none focus:ring-2 focus:ring-terra/30 sm:text-base"
             />
             <button
               type="submit"
-              className="shrink-0 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/20 transition-all duration-300 hover:scale-105 hover:shadow-orange-500/40 active:scale-95 sm:text-base"
+              className="shrink-0 rounded-xl bg-gradient-to-br from-terra to-terra-light px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_26px_-6px_rgba(194,99,47,0.6)] active:scale-95 sm:text-base"
             >
               Add Food
             </button>
@@ -840,20 +858,20 @@ export default function App() {
             {foods.map((food) => (
               <div
                 key={food.id}
-                className="group animate-fade-in relative overflow-hidden rounded-2xl bg-slate-800/60 ring-1 ring-white/10 transition-all duration-300 hover:ring-amber-400/50"
+                className="group animate-fade-in relative overflow-hidden rounded-2xl border border-line bg-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
               >
                 <FoodImage
                   name={food.name}
                   src={food.image}
                   className="h-24 w-full object-cover transition-transform duration-300 group-hover:scale-105 sm:h-28"
                 />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2">
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 py-2">
                   <span className="text-sm font-semibold text-white drop-shadow">{food.name}</span>
                 </div>
                 <button
                   onClick={() => requestDelete(food)}
                   aria-label={`Remove ${food.name}`}
-                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-all duration-300 hover:bg-rose-500"
+                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#2c2520]/55 text-white backdrop-blur transition-all duration-300 hover:bg-terra"
                 >
                   ✕
                 </button>
@@ -863,10 +881,10 @@ export default function App() {
         </section>
 
         {/* History */}
-        <section>
-          <h2 className="mb-4 text-lg font-bold text-slate-100">Dinner History</h2>
+        <section className="animate-float-up [animation-delay:240ms]">
+          <h2 className="mb-4 font-display text-lg font-semibold text-ink">Dinner History</h2>
           {history.length === 0 ? (
-            <p className="rounded-2xl bg-white/5 px-4 py-6 text-center text-sm text-slate-500 ring-1 ring-white/10">
+            <p className="rounded-2xl border border-line bg-white px-4 py-6 text-center text-sm text-muted shadow-sm">
               No spins yet — your past dinners will appear here. 🕑
             </p>
           ) : (
@@ -874,7 +892,7 @@ export default function App() {
               {history.map((entry) => (
                 <li
                   key={entry.id}
-                  className="animate-fade-in flex items-start gap-4 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+                  className="animate-fade-in flex items-start gap-4 rounded-2xl border border-line bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
                 >
                   <FoodImage
                     name={entry.name}
@@ -883,21 +901,21 @@ export default function App() {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="truncate font-semibold text-slate-100">{entry.name}</p>
+                      <p className="truncate font-semibold text-ink">{entry.name}</p>
                       {entry.place && (
-                        <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-300">
+                        <span className="shrink-0 rounded-full border border-line bg-cream px-2 py-0.5 text-xs text-muted">
                           {entry.place.emoji} {entry.place.name}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-400">Spun {formatDate(entry.time)}</p>
+                    <p className="text-xs text-muted">Spun {formatDate(entry.time)}</p>
                     {entry.eaten === true && (
-                      <p className="text-xs font-medium text-emerald-400">
+                      <p className="text-xs font-medium text-sage">
                         ✓ Ate this{entry.eatenAt ? ` · ${formatDate(entry.eatenAt)}` : ''}
                       </p>
                     )}
                     {entry.eaten === false && (
-                      <p className="text-xs font-medium text-slate-500">✗ Didn’t go</p>
+                      <p className="text-xs font-medium text-muted">✗ Didn’t go</p>
                     )}
                   </div>
 
@@ -908,8 +926,8 @@ export default function App() {
                       aria-pressed={entry.eaten === true}
                       className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-200 ${
                         entry.eaten === true
-                          ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
-                          : 'bg-white/5 text-slate-400 ring-1 ring-white/10 hover:bg-white/10'
+                          ? 'bg-sage/20 text-[#5d6a4c] ring-1 ring-sage/40'
+                          : 'border border-line bg-cream text-muted hover:text-ink'
                       }`}
                     >
                       ✅ Ate it
@@ -919,8 +937,8 @@ export default function App() {
                       aria-pressed={entry.eaten === false}
                       className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-200 ${
                         entry.eaten === false
-                          ? 'bg-rose-500/20 text-rose-300 ring-1 ring-rose-500/40'
-                          : 'bg-white/5 text-slate-400 ring-1 ring-white/10 hover:bg-white/10'
+                          ? 'bg-red-50 text-red-600 ring-1 ring-red-200'
+                          : 'border border-line bg-cream text-muted hover:text-ink'
                       }`}
                     >
                       ❌ Didn’t
@@ -932,37 +950,39 @@ export default function App() {
           )}
         </section>
 
-        <footer className="pb-4 pt-2 text-center text-xs text-slate-600">
-          Built with React + Vite + Tailwind · Photos from Unsplash
+        <footer className="pb-4 pt-2 text-center text-xs text-muted/70">
+          Built with React + Vite + Tailwind · Photos from Openverse
         </footer>
       </div>
 
       {/* Winner modal */}
       {winner && (
         <div
-          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-[#2c2520]/45 p-4 backdrop-blur-sm"
           onClick={() => setWinner(null)}
         >
           <div
-            className="animate-pop-in w-full max-w-sm overflow-hidden rounded-3xl bg-slate-900 shadow-2xl ring-1 ring-white/15"
+            className="animate-pop-in w-full max-w-sm overflow-hidden rounded-3xl border border-line bg-white shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative h-56 w-full">
+            <div className="relative h-60 w-full">
               <FoodImage
                 name={winner.name}
                 src={winner.image}
                 className="h-full w-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-white/10 to-transparent" />
             </div>
-            <div className="px-6 pb-6 pt-2 text-center">
-              <p className="text-sm font-medium uppercase tracking-widest text-amber-400">
+            <div className="px-6 pb-6 pt-1 text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-terra">
                 🎉 Tonight&apos;s Dinner is
               </p>
-              <h3 className="mt-1 text-3xl font-black text-white">{winner.name}!</h3>
+              <h3 className="mt-1.5 font-display text-4xl font-bold tracking-tight text-ink">
+                {winner.name}!
+              </h3>
               <button
                 onClick={() => setWinner(null)}
-                className="mt-6 w-full rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-3 font-bold text-white shadow-lg shadow-orange-500/30 transition-all duration-300 hover:scale-[1.02] active:scale-95"
+                className="mt-6 w-full rounded-xl bg-gradient-to-br from-terra to-terra-light px-6 py-3 font-semibold text-white shadow-[0_10px_26px_-8px_rgba(194,99,47,0.55)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
               >
                 Close
               </button>
@@ -974,18 +994,18 @@ export default function App() {
       {/* Add / edit place modal */}
       {placeModal && (
         <div
-          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-[#2c2520]/45 p-4 backdrop-blur-sm"
           onClick={() => setPlaceModal(null)}
         >
           <div
-            className="animate-pop-in w-full max-w-sm rounded-3xl bg-slate-900 p-6 shadow-2xl ring-1 ring-white/15"
+            className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-white p-6 shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-4 text-xl font-bold text-white">
+            <h3 className="mb-4 font-display text-xl font-semibold text-ink">
               {placeModal.mode === 'add' ? 'New place' : 'Edit place'}
             </h3>
 
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
               Name
             </label>
             <input
@@ -995,10 +1015,10 @@ export default function App() {
               onChange={(e) => setPlaceModal((m) => ({ ...m, name: e.target.value }))}
               onKeyDown={(e) => e.key === 'Enter' && savePlace()}
               placeholder="e.g. Gym, Beach, Downtown"
-              className="w-full rounded-xl border-0 bg-slate-800/80 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="w-full rounded-xl border border-line bg-cream px-4 py-3 text-sm text-ink placeholder-muted/70 focus:border-terra/50 focus:outline-none focus:ring-2 focus:ring-terra/30"
             />
 
-            <label className="mb-2 mt-4 block text-xs font-medium uppercase tracking-wide text-slate-400">
+            <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-muted">
               Icon
             </label>
             <div className="flex flex-wrap gap-2">
@@ -1008,8 +1028,8 @@ export default function App() {
                   onClick={() => setPlaceModal((m) => ({ ...m, emoji }))}
                   className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl transition-all duration-200 ${
                     placeModal.emoji === emoji
-                      ? 'bg-amber-400/20 ring-2 ring-amber-400'
-                      : 'bg-slate-800/80 ring-1 ring-white/10 hover:bg-slate-700/80'
+                      ? 'bg-terra/15 ring-2 ring-terra'
+                      : 'border border-line bg-cream hover:bg-line/40'
                   }`}
                 >
                   {emoji}
@@ -1020,7 +1040,7 @@ export default function App() {
             {editingPlace?.coords && (
               <button
                 onClick={clearPin}
-                className="mt-4 text-sm font-medium text-rose-300 hover:text-rose-200"
+                className="mt-4 text-sm font-medium text-red-600 hover:text-red-700"
               >
                 📍 Clear pinned location
               </button>
@@ -1030,7 +1050,7 @@ export default function App() {
               <button
                 onClick={savePlace}
                 disabled={!placeModal.name.trim()}
-                className="flex-1 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-500/25 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                className="flex-1 rounded-xl bg-gradient-to-br from-terra to-terra-light px-4 py-3 font-semibold text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 disabled:hover:translate-y-0"
               >
                 Save
               </button>
@@ -1039,14 +1059,14 @@ export default function App() {
                   onClick={deletePlace}
                   disabled={places.length <= 1}
                   title={places.length <= 1 ? 'Keep at least one place' : 'Delete place'}
-                  className="rounded-xl bg-rose-500/15 px-4 py-3 font-bold text-rose-300 ring-1 ring-rose-500/30 transition-all duration-300 hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-xl bg-red-50 px-4 py-3 font-semibold text-red-600 ring-1 ring-red-200 transition-all duration-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Delete
                 </button>
               )}
               <button
                 onClick={() => setPlaceModal(null)}
-                className="rounded-xl bg-white/5 px-4 py-3 font-medium text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+                className="rounded-xl border border-line bg-cream px-4 py-3 font-medium text-ink/70 transition-all duration-300 hover:bg-line/40"
               >
                 Cancel
               </button>
@@ -1058,22 +1078,22 @@ export default function App() {
       {/* Photo picker (shown when adding a food) */}
       {photoPicker && (
         <div
-          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-[#2c2520]/45 p-4 backdrop-blur-sm"
           onClick={() => setPhotoPicker(null)}
         >
           <div
-            className="animate-pop-in w-full max-w-md rounded-3xl bg-slate-900 p-6 shadow-2xl ring-1 ring-white/15"
+            className="animate-pop-in w-full max-w-md rounded-3xl border border-line bg-white p-6 shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-xl font-bold text-white">
-              Pick a photo for <span className="text-amber-300">{photoPicker.name}</span>
+            <h3 className="font-display text-xl font-semibold text-ink">
+              Pick a photo for <span className="text-terra">{photoPicker.name}</span>
             </h3>
-            <p className="mb-4 mt-1 text-sm text-slate-400">
+            <p className="mb-4 mt-1 text-sm text-muted">
               Tap the one that looks right, then add it to your menu.
             </p>
 
             {photoPicker.status === 'loading' && (
-              <div className="flex h-40 items-center justify-center text-slate-400">
+              <div className="flex h-40 items-center justify-center text-muted">
                 Finding photos…
               </div>
             )}
@@ -1087,7 +1107,7 @@ export default function App() {
                       key={r.id}
                       onClick={() => setPhotoPicker((p) => ({ ...p, selectedId: r.id }))}
                       className={`relative aspect-square overflow-hidden rounded-xl transition-all duration-200 ${
-                        selected ? 'ring-2 ring-amber-400' : 'ring-1 ring-white/10 hover:ring-white/30'
+                        selected ? 'ring-2 ring-terra' : 'ring-1 ring-line hover:ring-terra/40'
                       }`}
                     >
                       <img
@@ -1103,7 +1123,7 @@ export default function App() {
                         }}
                       />
                       {selected && (
-                        <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-xs text-slate-900">
+                        <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-terra text-xs text-white">
                           ✓
                         </span>
                       )}
@@ -1114,7 +1134,7 @@ export default function App() {
             )}
 
             {(photoPicker.status === 'empty' || photoPicker.status === 'error') && (
-              <p className="rounded-xl bg-white/5 px-4 py-6 text-center text-sm text-slate-400 ring-1 ring-white/10">
+              <p className="rounded-xl border border-line bg-cream px-4 py-6 text-center text-sm text-muted">
                 {photoPicker.status === 'error'
                   ? 'Couldn’t reach the photo search.'
                   : `No photos found for "${photoPicker.name}".`}{' '}
@@ -1126,26 +1146,26 @@ export default function App() {
               <button
                 onClick={confirmPhoto}
                 disabled={photoPicker.status === 'loading' || photoPicker.selectedId == null}
-                className="flex-1 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-500/25 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                className="flex-1 rounded-xl bg-gradient-to-br from-terra to-terra-light px-4 py-3 font-semibold text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 disabled:hover:translate-y-0"
               >
                 Add to menu
               </button>
               <button
                 onClick={() => commitFood(photoPicker.name)}
                 disabled={photoPicker.status === 'loading'}
-                className="rounded-xl bg-white/5 px-4 py-3 text-sm font-medium text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10 disabled:opacity-50"
+                className="rounded-xl border border-line bg-cream px-4 py-3 text-sm font-medium text-ink/70 transition-all duration-300 hover:bg-line/40 disabled:opacity-50"
               >
                 Use default
               </button>
               <button
                 onClick={() => setPhotoPicker(null)}
-                className="rounded-xl bg-white/5 px-4 py-3 text-sm font-medium text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+                className="rounded-xl border border-line bg-cream px-4 py-3 text-sm font-medium text-ink/70 transition-all duration-300 hover:bg-line/40"
               >
                 Cancel
               </button>
             </div>
 
-            <p className="mt-3 text-center text-[11px] text-slate-600">
+            <p className="mt-3 text-center text-[11px] text-muted/70">
               Photos via Openverse (Creative Commons)
             </p>
           </div>
@@ -1155,28 +1175,28 @@ export default function App() {
       {/* Confirm remove food */}
       {confirmDelete && (
         <div
-          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-[#2c2520]/45 p-4 backdrop-blur-sm"
           onClick={() => setConfirmDelete(null)}
         >
           <div
-            className="animate-pop-in w-full max-w-sm rounded-3xl bg-slate-900 p-6 text-center shadow-2xl ring-1 ring-white/15"
+            className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-white p-6 text-center shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-xl font-bold text-white">Remove this dish?</h3>
-            <p className="mt-2 text-sm text-slate-400">
-              <span className="font-semibold text-slate-200">{confirmDelete.name}</span> will be
-              removed from {activePlace.emoji} {activePlace.name}.
+            <h3 className="font-display text-xl font-semibold text-ink">Remove this dish?</h3>
+            <p className="mt-2 text-sm text-muted">
+              <span className="font-semibold text-ink">{confirmDelete.name}</span> will be removed
+              from {activePlace.emoji} {activePlace.name}.
             </p>
             <div className="mt-6 flex items-center gap-2">
               <button
                 onClick={confirmRemove}
-                className="flex-1 rounded-xl bg-gradient-to-r from-rose-500 to-red-500 px-4 py-3 font-bold text-white shadow-lg shadow-rose-500/25 transition-all duration-300 hover:scale-[1.02] active:scale-95"
+                className="flex-1 rounded-xl bg-gradient-to-br from-red-500 to-red-600 px-4 py-3 font-semibold text-white shadow-[0_8px_20px_-6px_rgba(220,60,40,0.45)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
               >
                 Remove
               </button>
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="flex-1 rounded-xl bg-white/5 px-4 py-3 font-medium text-slate-300 ring-1 ring-white/10 transition-all duration-300 hover:bg-white/10"
+                className="flex-1 rounded-xl border border-line bg-cream px-4 py-3 font-medium text-ink/70 transition-all duration-300 hover:bg-line/40"
               >
                 Cancel
               </button>

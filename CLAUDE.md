@@ -34,8 +34,9 @@ The whole app is one component, `src/App.jsx`; state lives in `useState` and is 
 ## Tech Stack & Commands
 
 React 19 · Vite 8 · JavaScript/JSX (**not** TypeScript) · Tailwind CSS v4 (`@tailwindcss/vite`)
-· ESLint (flat config). Food images come from the Unsplash CDN (no API key; curated photo IDs).
-**No test runner yet** — Vitest + React Testing Library is the natural fit if you add one.
+· ESLint (flat config). Fonts are self-hosted via `@fontsource-variable/space-grotesk` (display)
+and `@fontsource-variable/inter` (body), imported in `src/main.jsx`. Food images come from
+Openverse (keyless CC search). **No test runner yet** — Vitest + React Testing Library fits.
 
 ```bash
 npm install      # install deps
@@ -62,9 +63,13 @@ src/
 
 **Tailwind v4** is configured in CSS, not JS — there is **no `tailwind.config.js` or
 `postcss.config.js`**, and none are needed. It's enabled by the `@tailwindcss/vite` plugin
-plus `@import "tailwindcss";` at the top of `src/index.css`. For theming, use a CSS-first
-`@theme { … }` block rather than a JS config. Custom animations (`animate-pop-in`,
-`animate-fade-in`) are plain `@keyframes` in `index.css`.
+plus `@import "tailwindcss";` at the top of `src/index.css`. The app uses a **warm "light &
+cream" theme**; the palette + fonts live in a CSS-first `@theme { … }` block in `index.css`
+(color tokens `cream/ink/muted/line/terra/terra-light/sage/gold` → utilities like `bg-terra`,
+`text-ink`, `border-line`; `--font-display`/`--font-sans` → `font-display`/`font-sans`).
+The body sets the cream background, ambient radial glows (`body::before`) and a faint grain
+(`body::after`). Custom animations (`pop-in`, `fade-in`, `float-up`, `glow-pulse`) are plain
+`@keyframes`, all disabled under `prefers-reduced-motion`.
 
 ## Architecture (`src/App.jsx`)
 
@@ -112,8 +117,9 @@ Prefer extending these existing helpers over duplicating logic.
 ## Conventions
 
 - JavaScript + JSX only; functional components + hooks (no TS, no class components).
-- Styling is Tailwind utility classes inline; use `src/index.css` only for what utilities can't
-  express (keyframes, resets).
+- Styling is Tailwind utility classes inline, using the `@theme` tokens (`bg-terra`, `text-ink`,
+  `border-line`, `font-display`, …); use `src/index.css` only for what utilities can't express
+  (theme tokens, keyframes, body background/grain).
 - `PascalCase` component files, `camelCase` helpers/variables.
 - Keep state local; introduce a store/router only if scope genuinely grows (and document it).
 - Route all food imagery through Openverse (`searchFoodImages`) and render via `<FoodImage>`.
