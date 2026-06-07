@@ -6,13 +6,21 @@
 
   /* Warm "light & cream" palette */
   --color-cream: #f8f3ec;
+  --color-cream-deep: #efe6d7; /* layered insets / subtle fills */
+  --color-surface: #fffdf9; /* warm white for cards (softer than pure white) */
   --color-ink: #2c2520;
   --color-muted: #7b6f62;
   --color-line: #ece3d5;
   --color-terra: #c2632f;
   --color-terra-light: #d98a4e;
+  --color-terra-deep: #9c481f; /* gradient depth / pressed states */
   --color-sage: #7c8a6a;
   --color-gold: #e0a458;
+
+  /* Reusable elevation — warm-tinted shadows read more premium than grey. */
+  --shadow-soft: 0 2px 8px -2px rgba(120, 80, 40, 0.12);
+  --shadow-card: 0 14px 50px -22px rgba(120, 80, 40, 0.28);
+  --shadow-pop: 0 30px 80px -20px rgba(60, 36, 20, 0.5);
 }
 
 html {
@@ -29,16 +37,18 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Ambient warm glows for depth (fixed, behind everything). */
+/* Ambient warm glows for depth (fixed, behind everything). A slow drift keeps
+   the backdrop feeling alive without distracting from the wheel. */
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
+  inset: -20%;
   z-index: -2;
   background:
-    radial-gradient(60rem 60rem at 12% -8%, rgba(217, 138, 78, 0.22), transparent 60%),
-    radial-gradient(50rem 50rem at 110% 10%, rgba(124, 138, 106, 0.18), transparent 55%),
-    radial-gradient(55rem 55rem at 50% 115%, rgba(224, 164, 88, 0.16), transparent 60%);
+    radial-gradient(45rem 45rem at 12% -8%, rgba(217, 138, 78, 0.26), transparent 60%),
+    radial-gradient(40rem 40rem at 110% 8%, rgba(124, 138, 106, 0.2), transparent 55%),
+    radial-gradient(48rem 48rem at 50% 118%, rgba(224, 164, 88, 0.2), transparent 60%);
+  animation: ambient-drift 24s ease-in-out infinite alternate;
 }
 
 /* Faint grain for a tactile, premium surface. */
@@ -48,11 +58,28 @@ body::after {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.035;
+  opacity: 0.04;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* Consistent, on-brand keyboard focus ring (low specificity so components can
+   still opt out). Mouse users never see it; keyboard users always do. */
+:where(button, a, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-terra);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 /* ---- Keyframes ---- */
+@keyframes ambient-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(0, -2.5%, 0) scale(1.06);
+  }
+}
+
 @keyframes pop-in {
   0% {
     opacity: 0;
@@ -100,19 +127,81 @@ body::after {
     box-shadow: 0 8px 22px -6px rgba(194, 99, 47, 0.5);
   }
   50% {
-    box-shadow: 0 10px 30px -4px rgba(194, 99, 47, 0.85);
+    box-shadow: 0 12px 34px -4px rgba(194, 99, 47, 0.9);
   }
 }
 .animate-glow-pulse {
   animation: glow-pulse 2.4s ease-in-out infinite;
 }
 
+/* Slow breathing glow behind the wheel — premium ambient life at idle. */
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(1.04);
+  }
+}
+.animate-breathe {
+  animation: breathe 5s ease-in-out infinite;
+}
+
+/* Animated gradient text — a slow sheen across the hero word. */
+@keyframes shimmer {
+  to {
+    background-position: 200% center;
+  }
+}
+.text-shimmer {
+  background-image: linear-gradient(
+    110deg,
+    var(--color-terra) 0%,
+    var(--color-gold) 30%,
+    var(--color-terra-light) 50%,
+    var(--color-gold) 70%,
+    var(--color-terra) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 6s linear infinite;
+}
+
+/* A celebratory count-up "ping" for stat numbers when they change. */
+@keyframes ping-once {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-ping-once {
+  animation: ping-once 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  /* Entrance animations: skip the motion but reveal the element. */
   .animate-float-up,
-  .animate-glow-pulse,
   .animate-pop-in,
   .animate-fade-in {
     animation: none;
     opacity: 1;
+  }
+  /* Looping / ambient animations: just stop (keep their styled opacity). */
+  .animate-glow-pulse,
+  .animate-breathe,
+  .animate-ping-once,
+  .text-shimmer,
+  body::before {
+    animation: none;
   }
 }

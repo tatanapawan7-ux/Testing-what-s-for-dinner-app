@@ -830,18 +830,19 @@ export default function App() {
           onClick={() => setMuted((m) => !m)}
           aria-label={muted ? 'Unmute sound' : 'Mute sound'}
           title={muted ? 'Sound off' : 'Sound on'}
-          className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-base shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:right-6"
+          className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-base shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:right-6"
         >
           {muted ? '🔇' : '🔊'}
         </button>
 
         {/* Header */}
         <header className="animate-float-up text-center">
-          <h1 className="font-display text-[2.7rem] font-bold leading-[0.95] tracking-tight text-ink sm:text-6xl">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/70 px-3 py-1 text-xs font-medium text-muted shadow-soft backdrop-blur">
+            <span aria-hidden="true">🍽️</span> Your nightly dinner ritual
+          </span>
+          <h1 className="mt-4 font-display text-[2.7rem] font-bold leading-[0.95] tracking-tight text-ink sm:text-6xl">
             What&apos;s for{' '}
-            <span className="bg-gradient-to-br from-terra to-terra-light bg-clip-text text-transparent">
-              Dinner?
-            </span>
+            <span className="text-shimmer">Dinner?</span>
           </h1>
           <p className="mx-auto mt-4 max-w-sm text-sm text-muted sm:text-base">
             Pick a place, spin the wheel, and let fate plate your dinner.
@@ -860,7 +861,7 @@ export default function App() {
                   className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all duration-300 ${
                     active
                       ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.55)]'
-                      : 'border border-line bg-white text-ink/70 shadow-sm hover:-translate-y-0.5 hover:border-terra/40 hover:text-ink'
+                      : 'border border-line bg-surface text-ink/70 shadow-sm hover:-translate-y-0.5 hover:border-terra/40 hover:text-ink'
                   }`}
                 >
                   <span>{p.emoji}</span>
@@ -872,14 +873,14 @@ export default function App() {
             <button
               onClick={openEditPlace}
               aria-label="Edit current place"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-white text-ink/60 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-ink/60 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
             >
               ✎
             </button>
             <button
               onClick={openAddPlace}
               aria-label="Add a place"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-white text-lg text-ink/60 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-lg text-ink/60 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
             >
               ＋
             </button>
@@ -890,14 +891,14 @@ export default function App() {
             <button
               onClick={handleUseLocation}
               disabled={locating}
-              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink/80 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-terra/40 hover:shadow-md disabled:opacity-60"
+              className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink/80 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-terra/40 hover:shadow-md disabled:opacity-60"
             >
               {locating ? '… Locating' : '📍 Use my location'}
             </button>
             <button
               onClick={handlePinHere}
               disabled={locating}
-              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink/80 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-terra/40 hover:shadow-md disabled:opacity-60"
+              className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink/80 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-terra/40 hover:shadow-md disabled:opacity-60"
             >
               📌 Pin here
             </button>
@@ -912,18 +913,30 @@ export default function App() {
         {/* Wheel */}
         <section className="flex animate-float-up flex-col items-center [animation-delay:120ms]">
           <div className="relative">
-            {/* Ambient glow behind the wheel (brightens while spinning) */}
+            {/* Ambient glow behind the wheel (breathes at idle, flares while spinning) */}
             <div
               className={`pointer-events-none absolute inset-0 -z-10 rounded-full bg-terra/30 blur-3xl transition-opacity duration-500 ${
-                isSpinning ? 'opacity-90' : 'opacity-50'
+                isSpinning ? 'opacity-90' : 'opacity-60 animate-breathe'
               }`}
             />
 
-            {/* Pointer */}
-            <div className="absolute -top-1.5 left-1/2 z-20 h-0 w-0 -translate-x-1/2 border-l-[15px] border-r-[15px] border-t-[28px] border-l-transparent border-r-transparent border-t-[#2c2520] drop-shadow-[0_3px_5px_rgba(120,80,40,0.45)]" />
+            {/* Pointer — a polished gem pin (visual only; landing math is independent) */}
+            <div className="absolute -top-2.5 left-1/2 z-20 -translate-x-1/2 drop-shadow-[0_5px_6px_rgba(120,80,40,0.4)]">
+              <svg width="30" height="38" viewBox="0 0 32 40" fill="none" aria-hidden="true">
+                <path d="M16 39 L4.5 18 A12 12 0 1 1 27.5 18 Z" fill="url(#ptr)" />
+                <circle cx="16" cy="16" r="4.6" fill="#fffdf9" />
+                <circle cx="16" cy="16" r="4.6" fill="none" stroke="#c2632f" strokeWidth="1.3" />
+                <defs>
+                  <linearGradient id="ptr" x1="16" y1="4" x2="16" y2="39" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#3a302a" />
+                    <stop offset="1" stopColor="#231d18" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
 
-            {/* Outer ring */}
-            <div className="rounded-full bg-white p-2.5 shadow-[0_24px_60px_-18px_rgba(120,80,40,0.5)] ring-1 ring-line sm:p-3">
+            {/* Outer ring — a tactile gradient bezel */}
+            <div className="rounded-full bg-gradient-to-br from-surface to-cream-deep p-2.5 shadow-[0_28px_70px_-20px_rgba(120,80,40,0.55)] ring-1 ring-line sm:p-3">
               {/* Spinning disc */}
               <div
                 ref={wheelRef}
@@ -969,11 +982,12 @@ export default function App() {
             <button
               onClick={handleSpin}
               disabled={!canSpin}
-              className={`absolute left-1/2 top-1/2 z-10 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[5px] border-white bg-gradient-to-br from-terra to-terra-light text-base font-bold uppercase tracking-wider text-white shadow-[0_10px_28px_-6px_rgba(194,99,47,0.6)] transition-all duration-300 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100 sm:h-24 sm:w-24 sm:text-lg ${
+              className={`absolute left-1/2 top-1/2 z-10 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full border-[5px] border-surface bg-gradient-to-br from-terra-light via-terra to-terra-deep text-base font-bold uppercase tracking-wider text-white shadow-[0_10px_28px_-6px_rgba(194,99,47,0.6)] transition-all duration-300 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100 sm:h-24 sm:w-24 sm:text-lg ${
                 canSpin ? 'animate-glow-pulse' : ''
               }`}
             >
-              {isSpinning ? '…' : roundComplete ? 'Done' : 'Spin'}
+              <span className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/30 to-transparent" />
+              <span className="relative">{isSpinning ? '…' : roundComplete ? 'Done' : 'Spin'}</span>
             </button>
           </div>
 
@@ -991,7 +1005,7 @@ export default function App() {
               className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
                 variety
                   ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)]'
-                  : 'border border-line bg-white text-ink/70 shadow-sm hover:border-terra/40'
+                  : 'border border-line bg-surface text-ink/70 shadow-sm hover:border-terra/40'
               }`}
             >
               ✨ Favor variety
@@ -1002,7 +1016,7 @@ export default function App() {
               className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
                 knockout
                   ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)]'
-                  : 'border border-line bg-white text-ink/70 shadow-sm hover:border-terra/40'
+                  : 'border border-line bg-surface text-ink/70 shadow-sm hover:border-terra/40'
               }`}
             >
               🎯 Knock-out
@@ -1015,7 +1029,7 @@ export default function App() {
                   <span className="font-medium text-terra">Round complete — everything’s been picked!</span>
                   <button
                     onClick={resetRound}
-                    className="rounded-full border border-line bg-white px-3 py-1 font-medium text-ink/80 shadow-sm transition-all duration-300 hover:border-terra/40"
+                    className="rounded-full border border-line bg-surface px-3 py-1 font-medium text-ink/80 shadow-sm transition-all duration-300 hover:border-terra/40"
                   >
                     ↺ Reset round
                   </button>
@@ -1028,7 +1042,7 @@ export default function App() {
                   {remaining < foods.length && (
                     <button
                       onClick={resetRound}
-                      className="rounded-full border border-line bg-white px-3 py-1 font-medium text-ink/80 shadow-sm transition-all duration-300 hover:border-terra/40"
+                      className="rounded-full border border-line bg-surface px-3 py-1 font-medium text-ink/80 shadow-sm transition-all duration-300 hover:border-terra/40"
                     >
                       ↺ Reset
                     </button>
@@ -1040,7 +1054,7 @@ export default function App() {
         </section>
 
         {/* Food management */}
-        <section className="animate-float-up rounded-3xl border border-line bg-white p-5 shadow-[0_14px_50px_-22px_rgba(120,80,40,0.28)] [animation-delay:180ms] sm:p-6">
+        <section className="animate-float-up rounded-3xl border border-line bg-surface p-5 shadow-card [animation-delay:180ms] sm:p-6">
           <h2 className="mb-4 font-display text-lg font-semibold text-ink">
             {activePlace.emoji} {activePlace.name}
             <span className="text-muted"> — Menu</span>
@@ -1078,7 +1092,7 @@ export default function App() {
                   className="h-24 w-full object-cover transition-transform duration-300 group-hover:scale-105 sm:h-28"
                 />
                 {picked && (
-                  <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-terra shadow-sm">
+                  <span className="absolute left-2 top-2 rounded-full bg-surface/90 px-2 py-0.5 text-[11px] font-semibold text-terra shadow-sm">
                     ✓ picked
                   </span>
                 )}
@@ -1113,14 +1127,14 @@ export default function App() {
             {history.length > 0 && (
               <button
                 onClick={() => setConfirmClearHistory(true)}
-                className="rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-muted shadow-sm transition-all duration-300 hover:border-terra/40 hover:text-ink"
+                className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-muted shadow-sm transition-all duration-300 hover:border-terra/40 hover:text-ink"
               >
                 Clear all
               </button>
             )}
           </div>
           {history.length === 0 ? (
-            <p className="rounded-2xl border border-line bg-white px-4 py-6 text-center text-sm text-muted shadow-sm">
+            <p className="rounded-2xl border border-line bg-surface px-4 py-6 text-center text-sm text-muted shadow-sm">
               No spins yet — your past dinners will appear here. 🕑
             </p>
           ) : (
@@ -1128,7 +1142,7 @@ export default function App() {
               {history.map((entry) => (
                 <li
                   key={entry.id}
-                  className="animate-fade-in flex items-start gap-4 rounded-2xl border border-line bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+                  className="animate-fade-in flex items-start gap-4 rounded-2xl border border-line bg-surface p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
                 >
                   <FoodImage
                     name={entry.name}
@@ -1211,7 +1225,7 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="winner-title"
-            className="animate-pop-in w-full max-w-sm overflow-hidden rounded-3xl border border-line bg-white shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
+            className="animate-pop-in w-full max-w-sm overflow-hidden rounded-3xl border border-line bg-surface shadow-pop"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="relative h-60 w-full">
@@ -1264,7 +1278,7 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="place-title"
-            className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-white p-6 shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
+            className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-surface p-6 shadow-pop"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 id="place-title" className="mb-4 font-display text-xl font-semibold text-ink">
@@ -1351,7 +1365,7 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="photo-title"
-            className="animate-pop-in w-full max-w-md rounded-3xl border border-line bg-white p-6 shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
+            className="animate-pop-in w-full max-w-md rounded-3xl border border-line bg-surface p-6 shadow-pop"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 id="photo-title" className="font-display text-xl font-semibold text-ink">
@@ -1502,7 +1516,7 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-delete-title"
-            className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-white p-6 text-center shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
+            className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-surface p-6 text-center shadow-pop"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 id="confirm-delete-title" className="font-display text-xl font-semibold text-ink">Remove this dish?</h3>
@@ -1538,7 +1552,7 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-clear-title"
-            className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-white p-6 text-center shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
+            className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-surface p-6 text-center shadow-pop"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 id="confirm-clear-title" className="font-display text-xl font-semibold text-ink">Clear all history?</h3>
