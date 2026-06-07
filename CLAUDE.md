@@ -116,7 +116,9 @@ The body sets the cream background, ambient radial glows (`body::before`) and a 
   `playTick()`s as each segment passes the pointer, so clicks slow with the wheel; `stopTicking()`
   on spin end. All sounds honour `muted`.
 - **History** — each entry `{ id, name, image, time, place, eaten: null|true|false, eatenAt }`;
-  an "✅ Ate it / ❌ Didn't" control via `markEaten()` (older entries render as pending).
+  an "✅ Ate it / ❌ Didn't" control via `markEaten()` (older entries render as pending). Each
+  entry has a ✕ to remove just that spin (`removeHistoryEntry`); a confirm-gated **Clear all**
+  in the section header wipes the whole log (`clearHistory`).
 - **Edge cases** — empty/duplicate (per-place, case-insensitive) input blocked, removing a food
   asks via a confirm dialog (`confirmDelete`) and is blocked below 2 items, spin disabled while
   spinning or under 2 options, empty place shows a hint. Two
