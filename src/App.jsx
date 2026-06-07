@@ -367,6 +367,7 @@ export default function App() {
   // Photo picker shown when adding a food: { name, status, results, selectedId }
   const [photoPicker, setPhotoPicker] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null) // food pending removal
+  const [confirmClearHistory, setConfirmClearHistory] = useState(false) // history wipe pending
   const [muted, setMuted] = useState(() => loadState('wfd-muted', false))
 
   // Smarter spinning
@@ -785,6 +786,17 @@ export default function App() {
     )
   }
 
+  // Remove a single history entry (low-stakes — it's just a log, so no confirm).
+  function removeHistoryEntry(id) {
+    setHistory((prev) => prev.filter((e) => e.id !== id))
+  }
+
+  // Wipe the whole log (confirm-gated, like food deletion).
+  function clearHistory() {
+    setHistory([])
+    setConfirmClearHistory(false)
+  }
+
   const roundComplete = knockout && foods.length > 0 && foods.every((f) => roundWon.includes(f.id))
   const remaining = knockout ? foods.filter((f) => !roundWon.includes(f.id)).length : 0
   const canSpin = foods.length >= 2 && !isSpinning && !roundComplete
@@ -1077,7 +1089,17 @@ export default function App() {
 
         {/* History */}
         <section className="animate-float-up [animation-delay:240ms]">
-          <h2 className="mb-4 font-display text-lg font-semibold text-ink">Dinner History</h2>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-semibold text-ink">Dinner History</h2>
+            {history.length > 0 && (
+              <button
+                onClick={() => setConfirmClearHistory(true)}
+                className="rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-muted shadow-sm transition-all duration-300 hover:border-terra/40 hover:text-ink"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
           {history.length === 0 ? (
             <p className="rounded-2xl border border-line bg-white px-4 py-6 text-center text-sm text-muted shadow-sm">
               No spins yet — your past dinners will appear here. 🕑
@@ -1139,6 +1161,16 @@ export default function App() {
                       ❌ Didn’t
                     </button>
                   </div>
+
+                  {/* Remove this entry from the log */}
+                  <button
+                    onClick={() => removeHistoryEntry(entry.id)}
+                    aria-label={`Remove ${entry.name} from history`}
+                    title="Remove from history"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full border border-line bg-cream text-muted transition-all duration-300 hover:border-terra/40 hover:text-terra"
+                  >
+                    ✕
+                  </button>
                 </li>
               ))}
             </ul>
@@ -1456,6 +1488,40 @@ export default function App() {
               </button>
               <button
                 onClick={() => setConfirmDelete(null)}
+                className="flex-1 rounded-xl border border-line bg-cream px-4 py-3 font-medium text-ink/70 transition-all duration-300 hover:bg-line/40"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm clear history */}
+      {confirmClearHistory && (
+        <div
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-[#2c2520]/45 p-4 backdrop-blur-sm"
+          onClick={() => setConfirmClearHistory(false)}
+        >
+          <div
+            className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-white p-6 text-center shadow-[0_30px_80px_-20px_rgba(60,36,20,0.5)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-display text-xl font-semibold text-ink">Clear all history?</h3>
+            <p className="mt-2 text-sm text-muted">
+              This removes all {history.length}{' '}
+              {history.length === 1 ? 'entry' : 'entries'} from your dinner history. This can’t be
+              undone.
+            </p>
+            <div className="mt-6 flex items-center gap-2">
+              <button
+                onClick={clearHistory}
+                className="flex-1 rounded-xl bg-gradient-to-br from-red-500 to-red-600 px-4 py-3 font-semibold text-white shadow-[0_8px_20px_-6px_rgba(220,60,40,0.45)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+              >
+                Clear all
+              </button>
+              <button
+                onClick={() => setConfirmClearHistory(false)}
                 className="flex-1 rounded-xl border border-line bg-cream px-4 py-3 font-medium text-ink/70 transition-all duration-300 hover:bg-line/40"
               >
                 Cancel
