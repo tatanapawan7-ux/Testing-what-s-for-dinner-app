@@ -1,0 +1,17 @@
+{
+  "name": "What's for Dinner?",
+  "short_name": "Dinner",
+  "description": "Spin the wheel and let fate decide what's for dinner — with location menus, dinner history, and a celebratory winner.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8f3ec",
+  "theme_color": "#f8f3ec",
+  "categories": ["food", "lifestyle", "utilities"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
