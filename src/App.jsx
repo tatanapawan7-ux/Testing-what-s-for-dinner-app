@@ -233,6 +233,16 @@ function formatDate(ts) {
 const prefersReducedMotion = () =>
   typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
+// Best-effort haptic buzz (Android/Chrome; a no-op where unsupported). Honours
+// the same mute toggle as sound, so "mute" means a fully calm spin.
+function vibrate(pattern) {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(pattern)
+  } catch {
+    // best-effort
+  }
+}
+
 // A short celebratory confetti burst over the winner modal.
 function celebrate() {
   if (prefersReducedMotion()) return
@@ -369,6 +379,7 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(null) // food pending removal
   const [confirmClearHistory, setConfirmClearHistory] = useState(false) // history wipe pending
   const [muted, setMuted] = useState(() => loadState('wfd-muted', false))
+  const [shareCopied, setShareCopied] = useState(false) // brief "copied!" feedback
 
   // Smarter spinning
   const [variety, setVariety] = useState(() => loadState('wfd-variety', true))
@@ -747,6 +758,7 @@ export default function App() {
     if (!muted) {
       playWhoosh()
       startTicking()
+      vibrate(18)
     }
     // Safety net: stop ticking even if the transitionend event is missed.
     setTimeout(stopTicking, SPIN_MS + 300)
@@ -763,7 +775,10 @@ export default function App() {
     if (knockout) setRoundWon((prev) => (prev.includes(win.id) ? prev : [...prev, win.id]))
     setWinner(win)
     celebrate()
-    if (!muted) playFanfare()
+    if (!muted) {
+      playFanfare()
+      vibrate([35, 25, 90])
+    }
     setHistory((prev) => [
       {
         id: uid('hist'),
@@ -780,6 +795,28 @@ export default function App() {
   function spinAgain() {
     setWinner(null)
     setTimeout(() => handleSpin(), 120)
+  }
+
+  // Share the winning pick — native share sheet, with a clipboard fallback.
+  async function shareWinner(food) {
+    if (!food) return
+    const url = typeof window !== 'undefined' ? window.location.href : ''
+    const text = `Tonight I'm having ${food.name}! 🍽️ Decided on the What's for Dinner wheel.`
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title: "What's for Dinner?", text, url })
+      } catch {
+        // user dismissed the share sheet — nothing to do
+      }
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(url ? `${text} ${url}` : text)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    } catch {
+      setError('Sharing isn’t supported on this device.')
+    }
   }
   // Knock-out: clear the active place's foods from the won-this-round set.
   function resetRound() {
@@ -810,6 +847,21 @@ export default function App() {
     setHistory([])
     setConfirmClearHistory(false)
   }
+
+  // Lightweight dinner stats derived from history — a sticky, fun summary.
+  const stats = useMemo(() => {
+    const counts = new Map()
+    for (const h of history) counts.set(h.name, (counts.get(h.name) ?? 0) + 1)
+    let top = null
+    let topN = 0
+    for (const [name, n] of counts) {
+      if (n > topN) {
+        topN = n
+        top = name
+      }
+    }
+    return { total: history.length, top, eaten: history.filter((h) => h.eaten === true).length }
+  }, [history])
 
   const roundComplete = knockout && foods.length > 0 && foods.every((f) => roundWon.includes(f.id))
   const remaining = knockout ? foods.filter((f) => !roundWon.includes(f.id)).length : 0
@@ -1133,6 +1185,41 @@ export default function App() {
               </button>
             )}
           </div>
+
+          {stats.total > 0 && (
+            <div className="mb-4 grid grid-cols-3 gap-2.5">
+              <div className="rounded-2xl border border-line bg-surface p-3 text-center shadow-soft">
+                <div className="flex h-8 items-center justify-center font-display font-bold text-terra">
+                  <span key={stats.total} className="animate-ping-once text-2xl">
+                    {stats.total}
+                  </span>
+                </div>
+                <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                  Decided
+                </div>
+              </div>
+              <div className="rounded-2xl border border-line bg-surface p-3 text-center shadow-soft">
+                <div className="flex h-8 items-center justify-center font-display text-2xl font-bold text-sage">
+                  {stats.eaten}
+                </div>
+                <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                  Eaten
+                </div>
+              </div>
+              <div className="rounded-2xl border border-line bg-surface p-3 text-center shadow-soft">
+                <div
+                  className="flex h-8 items-center justify-center truncate px-1 font-display text-base font-bold text-ink"
+                  title={stats.top || ''}
+                >
+                  {stats.top || '—'}
+                </div>
+                <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                  Top pick
+                </div>
+              </div>
+            </div>
+          )}
+
           {history.length === 0 ? (
             <p className="rounded-2xl border border-line bg-surface px-4 py-6 text-center text-sm text-muted shadow-sm">
               No spins yet — your past dinners will appear here. 🕑
@@ -1234,7 +1321,7 @@ export default function App() {
                 src={winner.image}
                 className="h-full w-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-white via-white/10 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/10 to-transparent" />
             </div>
             <div className="px-6 pb-6 pt-1 text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-terra">
@@ -1263,6 +1350,12 @@ export default function App() {
                   Close
                 </button>
               </div>
+              <button
+                onClick={() => shareWinner(winner)}
+                className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-cream px-4 py-2.5 text-sm font-medium text-ink/70 transition-all duration-300 hover:border-terra/40 hover:text-ink active:scale-95"
+              >
+                {shareCopied ? '✓ Copied to clipboard' : '📤 Share this pick'}
+              </button>
             </div>
           </div>
         </div>
