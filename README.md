@@ -10,11 +10,24 @@ a celebratory winner modal and a persistent history of past spins.
 - 📍 **Location profiles** — separate menus per place (Home, Mall, Work…), with optional
   GPS "use my location" auto-switch to the nearest place you've pinned
 - ➕ **Menu management** — add/remove dishes per place; adding a dish shows a **photo picker**
-  of ~8 matching images (via the keyless Openverse CC search) so the picture fits the food
+  of matching images (TheMealDB + Openverse) so the picture fits the food — or paste your own
+  image link, and change any dish's photo later
 - 🎉 **Winner modal** with a confetti burst + celebratory chime (sound has a mute toggle)
 - 🗑️ **Confirm-before-delete** so you don't remove a dish by accident
 - 🕑 **Dinner history** timeline (tagged by place), persisted in `localStorage`
 - 📱 Responsive, mobile-first UI built with Tailwind CSS
+
+## How to Use
+
+1. **Pick a place** — tap a profile chip (Home, Mall, Work…) to load that menu, or hit
+   **📍 Use my location** to auto-switch to the nearest place you've pinned.
+2. **Build your menu** — type a dish, press **Add Food**, and choose a photo (or paste a link).
+   Tap the 🖼 on any card to change its photo, or ✕ to remove it.
+3. **Spin the wheel** — press **SPIN** and let it land on tonight's dinner. Toggle
+   **✨ Favor variety** or **🎯 Knock-out** under the wheel for smarter picking, and
+   **🔊/🔇** to control sound.
+4. **Track it** — each result is logged to **Dinner History**; mark whether you actually
+   **✅ Ate it** or **❌ Didn't**. Everything is saved in your browser, so it persists on refresh.
 
 ## Tech Stack
 
@@ -41,4 +54,5 @@ npm run dev      # http://localhost:5173
 The whole app lives in `src/App.jsx`. See [`CLAUDE.md`](./CLAUDE.md) for architecture,
 conventions, and the Tailwind v4 setup.
 
-Food imagery comes from the Unsplash CDN (no API key required).
+Food imagery comes from TheMealDB and Openverse (no API key required), with a graceful
+placeholder when an image can't load.
