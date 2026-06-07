@@ -51,25 +51,38 @@ Always run `npm run build` and `npm run lint` before committing — both must pa
 ## Project Structure
 
 ```
-index.html            # Vite entry (title: "What's for Dinner?")
+index.html            # Vite entry (title + manifest, icons, OG/Twitter meta)
 vite.config.js        # react() + tailwindcss() plugins
 eslint.config.js      # ESLint flat config
-public/favicon.svg
+public/
+  favicon.svg            # on-brand "decision wheel" mark
+  icon-192.png           # PWA icons (192/512 + maskable)
+  icon-512.png
+  icon-maskable-512.png
+  apple-touch-icon.png
+  og.png                 # 1200x630 social-share card
+  manifest.webmanifest   # installable PWA manifest
 src/
   main.jsx            # React root; imports ./index.css
   App.jsx             # the entire application
   index.css           # @import "tailwindcss" + custom keyframes
 ```
 
+The icon set + `og.png` were generated from hand-written SVG via `sharp` (a one-off
+build-time step, not a runtime dep); regenerate by re-rendering those SVGs if the mark changes.
+
 **Tailwind v4** is configured in CSS, not JS — there is **no `tailwind.config.js` or
 `postcss.config.js`**, and none are needed. It's enabled by the `@tailwindcss/vite` plugin
 plus `@import "tailwindcss";` at the top of `src/index.css`. The app uses a **warm "light &
 cream" theme**; the palette + fonts live in a CSS-first `@theme { … }` block in `index.css`
-(color tokens `cream/ink/muted/line/terra/terra-light/sage/gold` → utilities like `bg-terra`,
-`text-ink`, `border-line`; `--font-display`/`--font-sans` → `font-display`/`font-sans`).
-The body sets the cream background, ambient radial glows (`body::before`) and a faint grain
-(`body::after`). Custom animations (`pop-in`, `fade-in`, `float-up`, `glow-pulse`) are plain
-`@keyframes`, all disabled under `prefers-reduced-motion`.
+(color tokens `cream/cream-deep/surface/ink/muted/line/terra/terra-light/terra-deep/sage/gold`
+→ utilities like `bg-terra`, `bg-surface`, `text-ink`, `border-line`; elevation tokens
+`--shadow-soft/card/pop` → `shadow-soft/card/pop`; `--font-display`/`--font-sans` →
+`font-display`/`font-sans`). Cards use `bg-surface` (warm white). The body sets the cream
+background, slowly drifting ambient glows (`body::before`) and a faint grain (`body::after`);
+there's an on-brand `:focus-visible` ring and `::selection` tint. Custom animations
+(`pop-in`, `fade-in`, `float-up`, `glow-pulse`, `breathe`, `shimmer`, `ping-once`,
+`ambient-drift`) are plain `@keyframes`, all disabled/neutralised under `prefers-reduced-motion`.
 
 ## Architecture (`src/App.jsx`)
 
@@ -110,7 +123,9 @@ The body sets the cream background, ambient radial glows (`body::before`) and a 
   wheel; the winner modal has a **Spin again** (`spinAgain`). `handleSpinEnd` reveals the winner
   and logs history (tagged with the place), then
   celebrates: `celebrate()` fires a `canvas-confetti` burst (skipped under `prefers-reduced-motion`)
-  and `playFanfare()` plays a Web Audio chime — gated by the persisted mute toggle (`wfd-muted`).
+  and `playFanfare()` plays a Web Audio chime + a `vibrate()` haptic buzz — all gated by the
+  persisted mute toggle (`wfd-muted`). The winner modal also has a **Share this pick**
+  (`shareWinner`) — Web Share API with a clipboard fallback (`shareCopied` feedback).
 - **Spin sounds** (Web Audio, no assets) — `playWhoosh()` on launch, then `startTicking()` runs a
   `requestAnimationFrame` loop that reads the wheel's real rotation (`readWheelAngle`) and
   `playTick()`s as each segment passes the pointer, so clicks slow with the wheel; `stopTicking()`
@@ -118,7 +133,12 @@ The body sets the cream background, ambient radial glows (`body::before`) and a 
 - **History** — each entry `{ id, name, image, time, place, eaten: null|true|false, eatenAt }`;
   an "✅ Ate it / ❌ Didn't" control via `markEaten()` (older entries render as pending). Each
   entry has a ✕ to remove just that spin (`removeHistoryEntry`); a confirm-gated **Clear all**
-  in the section header wipes the whole log (`clearHistory`).
+  in the section header wipes the whole log (`clearHistory`). A compact 3-up **stats** strip
+  (`stats` memo: total decided, eaten, top pick) sits above the list when history is non-empty.
+- **Installable (PWA)** — `public/manifest.webmanifest` (standalone, themed) + icon set + apple
+  touch icon make it home-screen installable; `index.html` carries description + OG/Twitter meta
+  (absolute `og.png`). All `public/` paths and the Vite `base` are **relative** (`./`) so they
+  resolve under the GitHub Pages subpath.
 - **Edge cases** — empty/duplicate (per-place, case-insensitive) input blocked, removing a food
   asks via a confirm dialog (`confirmDelete`) and is blocked below 2 items, spin disabled while
   spinning or under 2 options, empty place shows a hint. Two

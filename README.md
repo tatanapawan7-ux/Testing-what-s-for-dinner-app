@@ -4,17 +4,25 @@ A mobile-first, single-page React app that helps you decide what to eat. Add you
 options, give the **Decision Wheel** a spin, and let fate pick your dinner — complete with
 a celebratory winner modal and a persistent history of past spins.
 
+**▶️ Live:** https://tatanapawan7-ux.github.io/Testing-what-s-for-dinner-app/
+
 ## Features
 
-- 🎡 **Interactive decision wheel** with smooth, eased spin animation
+- 🎡 **Interactive decision wheel** with smooth, eased spin animation, spin sounds, and
+  optional haptic buzz on mobile
 - 📍 **Location profiles** — separate menus per place (Home, Mall, Work…), with optional
   GPS "use my location" auto-switch to the nearest place you've pinned
 - ➕ **Menu management** — add/remove dishes per place; adding a dish shows a **photo picker**
   of matching images (TheMealDB + Openverse) so the picture fits the food — or paste your own
   image link, and change any dish's photo later
-- 🎉 **Winner modal** with a confetti burst + celebratory chime (sound has a mute toggle)
-- 🗑️ **Confirm-before-delete** so you don't remove a dish by accident
-- 🕑 **Dinner history** timeline (tagged by place), persisted in `localStorage`
+- 🎉 **Winner modal** with a confetti burst + celebratory chime (sound has a mute toggle),
+  and a **Share this pick** button (native share sheet → clipboard fallback)
+- 📊 **Dinner stats** — total decided, eaten, and your top pick, summarised at a glance
+- 🕑 **Dinner history** timeline (tagged by place), persisted in `localStorage`; remove a
+  single spin or clear the whole log
+- ♿ **Accessible** — labelled dialogs, Escape-to-close, screen-reader winner announcements,
+  and `prefers-reduced-motion` support
+- 📲 **Installable PWA** — add it to your home screen for an app-like, full-screen experience
 - 📱 Responsive, mobile-first UI built with Tailwind CSS
 
 ## How to Use
