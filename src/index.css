@@ -28,6 +28,11 @@ html {
   color-scheme: light;
 }
 
+::selection {
+  background: rgba(194, 99, 47, 0.18);
+  color: #2c2520;
+}
+
 body {
   margin: 0;
   background: #f8f3ec;

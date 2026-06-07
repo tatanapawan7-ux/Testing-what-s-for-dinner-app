@@ -452,7 +452,7 @@ export default function App() {
 
   // conic-gradient background for the wheel slices.
   const wheelBackground = useMemo(() => {
-    if (foods.length === 0) return '#1e293b'
+    if (foods.length === 0) return 'radial-gradient(circle at 50% 38%, #dca97e, #a6603c)'
     const stops = foods
       .map((_, i) => {
         const color = WHEEL_COLORS[i % WHEEL_COLORS.length]
