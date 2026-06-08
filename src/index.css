@@ -42,18 +42,16 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Ambient warm glows for depth (fixed, behind everything). A slow drift keeps
-   the backdrop feeling alive without distracting from the wheel. */
+/* Ambient warm glows for depth (fixed, behind everything) — subtle and static. */
 body::before {
   content: '';
   position: fixed;
-  inset: -20%;
+  inset: 0;
   z-index: -2;
   background:
-    radial-gradient(45rem 45rem at 12% -8%, rgba(217, 138, 78, 0.26), transparent 60%),
-    radial-gradient(40rem 40rem at 110% 8%, rgba(124, 138, 106, 0.2), transparent 55%),
-    radial-gradient(48rem 48rem at 50% 118%, rgba(224, 164, 88, 0.2), transparent 60%);
-  animation: ambient-drift 24s ease-in-out infinite alternate;
+    radial-gradient(45rem 45rem at 12% -8%, rgba(217, 138, 78, 0.2), transparent 60%),
+    radial-gradient(40rem 40rem at 110% 8%, rgba(124, 138, 106, 0.16), transparent 55%),
+    radial-gradient(48rem 48rem at 50% 118%, rgba(224, 164, 88, 0.16), transparent 60%);
 }
 
 /* Faint grain for a tactile, premium surface. */
@@ -76,15 +74,6 @@ body::after {
 }
 
 /* ---- Keyframes ---- */
-@keyframes ambient-drift {
-  from {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  to {
-    transform: translate3d(0, -2.5%, 0) scale(1.06);
-  }
-}
-
 @keyframes pop-in {
   0% {
     opacity: 0;
@@ -139,45 +128,7 @@ body::after {
   animation: glow-pulse 2.4s ease-in-out infinite;
 }
 
-/* Slow breathing glow behind the wheel — premium ambient life at idle. */
-@keyframes breathe {
-  0%,
-  100% {
-    opacity: 0.5;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.72;
-    transform: scale(1.04);
-  }
-}
-.animate-breathe {
-  animation: breathe 5s ease-in-out infinite;
-}
-
-/* Animated gradient text — a slow sheen across the hero word. */
-@keyframes shimmer {
-  to {
-    background-position: 200% center;
-  }
-}
-.text-shimmer {
-  background-image: linear-gradient(
-    110deg,
-    var(--color-terra) 0%,
-    var(--color-gold) 30%,
-    var(--color-terra-light) 50%,
-    var(--color-gold) 70%,
-    var(--color-terra) 100%
-  );
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: shimmer 6s linear infinite;
-}
-
-/* A celebratory count-up "ping" for stat numbers when they change. */
+/* A subtle count-up "ping" for stat numbers when they change. */
 @keyframes ping-once {
   0% {
     transform: scale(1);
@@ -203,10 +154,7 @@ body::after {
   }
   /* Looping / ambient animations: just stop (keep their styled opacity). */
   .animate-glow-pulse,
-  .animate-breathe,
-  .animate-ping-once,
-  .text-shimmer,
-  body::before {
+  .animate-ping-once {
     animation: none;
   }
 }

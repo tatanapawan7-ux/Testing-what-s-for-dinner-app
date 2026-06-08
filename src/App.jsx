@@ -801,7 +801,7 @@ export default function App() {
   async function shareWinner(food) {
     if (!food) return
     const url = typeof window !== 'undefined' ? window.location.href : ''
-    const text = `Tonight I'm having ${food.name}! 🍽️ Decided on the What's for Dinner wheel.`
+    const text = `Tonight's pick: ${food.name}. Decided with the What's for Dinner wheel.`
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({ title: "What's for Dinner?", text, url })
@@ -889,15 +889,17 @@ export default function App() {
 
         {/* Header */}
         <header className="animate-float-up text-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/70 px-3 py-1 text-xs font-medium text-muted shadow-soft backdrop-blur">
-            <span aria-hidden="true">🍽️</span> Your nightly dinner ritual
-          </span>
-          <h1 className="mt-4 font-display text-[2.7rem] font-bold leading-[0.95] tracking-tight text-ink sm:text-6xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-terra/90">
+            Decide in one spin
+          </p>
+          <h1 className="mt-3 font-display text-[2.7rem] font-bold leading-[0.95] tracking-tight text-ink sm:text-6xl">
             What&apos;s for{' '}
-            <span className="text-shimmer">Dinner?</span>
+            <span className="bg-gradient-to-br from-terra to-terra-deep bg-clip-text text-transparent">
+              Dinner?
+            </span>
           </h1>
-          <p className="mx-auto mt-4 max-w-sm text-sm text-muted sm:text-base">
-            Pick a place, spin the wheel, and let fate plate your dinner.
+          <p className="mx-auto mt-4 max-w-md text-sm text-muted sm:text-base">
+            Choose a place, spin the wheel, and get your answer in seconds.
           </p>
         </header>
 
@@ -965,10 +967,10 @@ export default function App() {
         {/* Wheel */}
         <section className="flex animate-float-up flex-col items-center [animation-delay:120ms]">
           <div className="relative">
-            {/* Ambient glow behind the wheel (breathes at idle, flares while spinning) */}
+            {/* Ambient glow behind the wheel (flares while spinning) */}
             <div
               className={`pointer-events-none absolute inset-0 -z-10 rounded-full bg-terra/30 blur-3xl transition-opacity duration-500 ${
-                isSpinning ? 'opacity-90' : 'opacity-60 animate-breathe'
+                isSpinning ? 'opacity-90' : 'opacity-50'
               }`}
             />
 
@@ -1060,7 +1062,7 @@ export default function App() {
                   : 'border border-line bg-surface text-ink/70 shadow-sm hover:border-terra/40'
               }`}
             >
-              ✨ Favor variety
+              Favor variety
             </button>
             <button
               onClick={() => setKnockout((k) => !k)}
@@ -1071,7 +1073,7 @@ export default function App() {
                   : 'border border-line bg-surface text-ink/70 shadow-sm hover:border-terra/40'
               }`}
             >
-              🎯 Knock-out
+              Knock-out
             </button>
           </div>
           {knockout && (
@@ -1222,7 +1224,7 @@ export default function App() {
 
           {history.length === 0 ? (
             <p className="rounded-2xl border border-line bg-surface px-4 py-6 text-center text-sm text-muted shadow-sm">
-              No spins yet — your past dinners will appear here. 🕑
+              No spins yet — your past decisions will appear here.
             </p>
           ) : (
             <ul className="flex flex-col gap-3">
@@ -1324,11 +1326,11 @@ export default function App() {
               <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/10 to-transparent" />
             </div>
             <div className="px-6 pb-6 pt-1 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-terra">
-                🎉 Tonight&apos;s Dinner is
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-terra">
+                Tonight&apos;s pick
               </p>
               <h3 id="winner-title" className="mt-1.5 font-display text-4xl font-bold tracking-tight text-ink">
-                {winner.name}!
+                {winner.name}
               </h3>
               <div className="mt-6 flex items-center gap-2">
                 {!roundComplete && (
@@ -1336,7 +1338,7 @@ export default function App() {
                     onClick={spinAgain}
                     className="flex-1 rounded-xl bg-gradient-to-br from-terra to-terra-light px-5 py-3 font-semibold text-white shadow-[0_10px_26px_-8px_rgba(194,99,47,0.55)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                   >
-                    🎡 Spin again
+                    Spin again
                   </button>
                 )}
                 <button
@@ -1354,7 +1356,7 @@ export default function App() {
                 onClick={() => shareWinner(winner)}
                 className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-cream px-4 py-2.5 text-sm font-medium text-ink/70 transition-all duration-300 hover:border-terra/40 hover:text-ink active:scale-95"
               >
-                {shareCopied ? '✓ Copied to clipboard' : '📤 Share this pick'}
+                {shareCopied ? 'Copied to clipboard' : 'Share this pick'}
               </button>
             </div>
           </div>

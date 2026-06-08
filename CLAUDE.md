@@ -79,10 +79,11 @@ cream" theme**; the palette + fonts live in a CSS-first `@theme { … }` block i
 → utilities like `bg-terra`, `bg-surface`, `text-ink`, `border-line`; elevation tokens
 `--shadow-soft/card/pop` → `shadow-soft/card/pop`; `--font-display`/`--font-sans` →
 `font-display`/`font-sans`). Cards use `bg-surface` (warm white). The body sets the cream
-background, slowly drifting ambient glows (`body::before`) and a faint grain (`body::after`);
+background, soft static ambient glows (`body::before`) and a faint grain (`body::after`);
 there's an on-brand `:focus-visible` ring and `::selection` tint. Custom animations
-(`pop-in`, `fade-in`, `float-up`, `glow-pulse`, `breathe`, `shimmer`, `ping-once`,
-`ambient-drift`) are plain `@keyframes`, all disabled/neutralised under `prefers-reduced-motion`.
+(`pop-in`, `fade-in`, `float-up`, `glow-pulse`, `ping-once`) are plain `@keyframes`, all
+disabled/neutralised under `prefers-reduced-motion`. The aesthetic is deliberately restrained
+(no looping shimmer/breathing effects) for a refined, professional feel.
 
 ## Architecture (`src/App.jsx`)
 
