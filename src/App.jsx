@@ -236,6 +236,8 @@ out center 60;`
         name,
         cuisine: el.tags.cuisine ? el.tags.cuisine.split(/[;,]/)[0].replace(/_/g, ' ') : null,
         kind: el.tags.amenity,
+        lat: elat,
+        lng: elng,
         dist: distanceMeters({ lat, lng }, { lat: elat, lng: elng }),
       })
     }
@@ -533,7 +535,7 @@ export default function App() {
       for (const food of needs) {
         if (cancelled) break
         try {
-          const [first] = await searchFoodImages(food.name, 1)
+          const [first] = await searchFoodImages(food.imageQuery || food.name, 1)
           const image = first?.full || first?.thumb
           if (image && !cancelled) {
             setPlaces((prev) =>
@@ -736,18 +738,31 @@ export default function App() {
 
   // Find eateries around the user's current location, then open the picker.
   function handleNearby() {
-    withPosition((here) => {
-      setNearbyModal({ status: 'loading', results: [], selected: [] })
-      searchNearbyRestaurants(here.lat, here.lng)
-        .then((results) =>
-          setNearbyModal({
-            status: results.length ? 'ok' : 'empty',
-            results,
-            selected: results.slice(0, 10).map((r) => r.name),
-          }),
-        )
-        .catch(() => setNearbyModal({ status: 'error', results: [], selected: [] }))
-    })
+    withPosition((here) => runNearbySearch(here.lat, here.lng, 3000))
+  }
+
+  // Query OSM at a given radius. Re-run by the distance pills; keeps the resolved
+  // position so changing radius never re-prompts for location.
+  function runNearbySearch(lat, lng, radius) {
+    setNearbyModal({ status: 'loading', results: [], selected: [], lat, lng, radius, typeFilter: 'all' })
+    searchNearbyRestaurants(lat, lng, radius)
+      .then((results) =>
+        setNearbyModal((m) =>
+          m && m.radius === radius && m.status === 'loading'
+            ? {
+                ...m,
+                status: results.length ? 'ok' : 'empty',
+                results,
+                selected: results.slice(0, 12).map((r) => r.name),
+              }
+            : m,
+        ),
+      )
+      .catch(() =>
+        setNearbyModal((m) =>
+          m && m.radius === radius ? { ...m, status: 'error', results: [], selected: [] } : m,
+        ),
+      )
   }
 
   // Toggle a restaurant in the picker's selection.
@@ -765,15 +780,22 @@ export default function App() {
   }
 
   // Drop the chosen restaurants into a dedicated "Nearby" place and switch to it,
-  // so the existing wheel/spin/history all work on real nearby spots.
+  // so the existing wheel/spin/history all work on real nearby spots. Each food
+  // carries its coords (for "Open in Maps") and a cuisine-based image query.
   function applyNearby() {
     const chosen = nearbyModal.results.filter((r) => nearbyModal.selected.includes(r.name))
     if (!chosen.length) return
-    const foods = chosen.map((r) => makeFood(r.name))
+    const foods = chosen.map((r) => ({
+      ...makeFood(r.name),
+      lat: r.lat,
+      lng: r.lng,
+      imageQuery: r.cuisine || (r.kind === 'cafe' ? 'cafe' : 'restaurant food'),
+    }))
     const existing = places.find((p) => p.name === 'Nearby')
     if (existing) {
       setPlaces((prev) => prev.map((p) => (p.id === existing.id ? { ...p, foods } : p)))
       setActivePlaceId(existing.id)
+      healedPlaces.current.delete(existing.id) // let the refreshed spots heal their images
     } else {
       const place = makePlace('Nearby', '🍴')
       place.foods = foods
@@ -964,6 +986,14 @@ export default function App() {
     }
     return { total: history.length, top, eaten: history.filter((h) => h.eaten === true).length }
   }, [history])
+
+  // Nearby picker list after the type filter (client-side; no re-fetch).
+  const nearbyFiltered =
+    nearbyModal?.status === 'ok'
+      ? nearbyModal.results.filter(
+          (r) => nearbyModal.typeFilter === 'all' || r.kind === nearbyModal.typeFilter,
+        )
+      : []
 
   const roundComplete = knockout && foods.length > 0 && foods.every((f) => roundWon.includes(f.id))
   const remaining = knockout ? foods.filter((f) => !roundWon.includes(f.id)).length : 0
@@ -1441,6 +1471,16 @@ export default function App() {
               <h3 id="winner-title" className="mt-1.5 font-display text-4xl font-bold tracking-tight text-ink">
                 {winner.name}
               </h3>
+              {winner.lat != null && (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${winner.lat},${winner.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-terra hover:underline"
+                >
+                  Open in Maps ↗
+                </a>
+              )}
               <div className="mt-6 flex items-center gap-2">
                 {!roundComplete && (
                   <button
@@ -1799,9 +1839,34 @@ export default function App() {
             <h3 id="nearby-title" className="font-display text-xl font-semibold text-ink">
               Restaurants near you
             </h3>
-            <p className="mb-4 mt-1 text-sm text-muted">
+            <p className="mb-3 mt-1 text-sm text-muted">
               From OpenStreetMap. Pick the spots you&apos;d consider, then spin to decide.
             </p>
+
+            {/* Distance selector (re-queries OSM) */}
+            {nearbyModal.lat != null && (
+              <div className="mb-3 flex items-center gap-1.5">
+                <span className="mr-1 text-xs font-medium text-muted">Within</span>
+                {[
+                  [1000, '1 km'],
+                  [3000, '3 km'],
+                  [5000, '5 km'],
+                ].map(([r, label]) => (
+                  <button
+                    key={r}
+                    onClick={() => runNearbySearch(nearbyModal.lat, nearbyModal.lng, r)}
+                    aria-pressed={nearbyModal.radius === r}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 ${
+                      nearbyModal.radius === r
+                        ? 'bg-terra text-white'
+                        : 'border border-line bg-cream text-ink/70 hover:border-terra/40'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {nearbyModal.status === 'loading' && (
               <div className="flex h-40 items-center justify-center text-muted">
@@ -1813,51 +1878,84 @@ export default function App() {
               <p className="rounded-xl border border-line bg-cream px-4 py-6 text-center text-sm text-muted">
                 {nearbyModal.status === 'error'
                   ? 'Couldn’t reach the restaurant search. Please try again.'
-                  : 'No restaurants found nearby. Try again from a different spot.'}
+                  : 'No restaurants found here. Try a wider distance above.'}
               </p>
             )}
 
             {nearbyModal.status === 'ok' && (
-              <div className="-mx-1 flex-1 space-y-1.5 overflow-y-auto px-1">
-                {nearbyModal.results.map((r) => {
-                  const on = nearbyModal.selected.includes(r.name)
-                  const tags = [
-                    r.cuisine,
-                    r.kind === 'cafe' ? 'café' : r.kind === 'fast_food' ? 'fast food' : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')
-                  return (
+              <>
+                {/* Type filter (client-side) */}
+                <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                  {[
+                    ['all', 'All'],
+                    ['restaurant', 'Restaurants'],
+                    ['fast_food', 'Fast food'],
+                    ['cafe', 'Cafés'],
+                  ].map(([k, label]) => (
                     <button
-                      key={`${r.name}-${Math.round(r.dist)}`}
-                      onClick={() => toggleNearby(r.name)}
-                      aria-pressed={on}
-                      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-200 ${
-                        on
-                          ? 'border-terra/50 bg-terra/5'
-                          : 'border-line bg-cream hover:border-terra/30'
+                      key={k}
+                      onClick={() => setNearbyModal((m) => (m ? { ...m, typeFilter: k } : m))}
+                      aria-pressed={nearbyModal.typeFilter === k}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 ${
+                        nearbyModal.typeFilter === k
+                          ? 'bg-ink text-white'
+                          : 'border border-line bg-cream text-ink/70 hover:border-terra/40'
                       }`}
                     >
-                      <span
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-xs ${
-                          on ? 'border-terra bg-terra text-white' : 'border-line text-transparent'
-                        }`}
-                      >
-                        ✓
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium text-ink">{r.name}</span>
-                        <span className="block truncate text-xs capitalize text-muted">
-                          {tags || 'restaurant'}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-xs font-medium text-muted">
-                        {formatDistance(r.dist)}
-                      </span>
+                      {label}
                     </button>
-                  )
-                })}
-              </div>
+                  ))}
+                </div>
+
+                {nearbyFiltered.length ? (
+                  <div className="-mx-1 flex-1 space-y-1.5 overflow-y-auto px-1">
+                    {nearbyFiltered.map((r) => {
+                      const on = nearbyModal.selected.includes(r.name)
+                      const tags = [
+                        r.cuisine,
+                        r.kind === 'cafe' ? 'café' : r.kind === 'fast_food' ? 'fast food' : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')
+                      return (
+                        <button
+                          key={`${r.name}-${Math.round(r.dist)}`}
+                          onClick={() => toggleNearby(r.name)}
+                          aria-pressed={on}
+                          className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-200 ${
+                            on
+                              ? 'border-terra/50 bg-terra/5'
+                              : 'border-line bg-cream hover:border-terra/30'
+                          }`}
+                        >
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-xs ${
+                              on
+                                ? 'border-terra bg-terra text-white'
+                                : 'border-line text-transparent'
+                            }`}
+                          >
+                            ✓
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium text-ink">{r.name}</span>
+                            <span className="block truncate text-xs capitalize text-muted">
+                              {tags || 'restaurant'}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-xs font-medium text-muted">
+                            {formatDistance(r.dist)}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="flex-1 rounded-xl border border-line bg-cream px-4 py-6 text-center text-sm text-muted">
+                    No matches for that filter.
+                  </p>
+                )}
+              </>
             )}
 
             <div className="mt-5 flex items-center gap-2">

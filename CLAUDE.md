@@ -114,11 +114,16 @@ disabled/neutralised under `prefers-reduced-motion`. The aesthetic is deliberate
   nearest pinned place within `GEO_RADIUS_M` (250 m) via `distanceMeters()`. **Only works over
   HTTPS or localhost** (dev + GitHub Pages, not plain HTTP).
 - **Nearby restaurants** — "🍴 Near me" (`handleNearby`) gets the user's position, then
-  `searchNearbyRestaurants(lat,lng)` queries **OpenStreetMap's Overpass API** (keyless, CORS-OK,
-  via a "simple" GET `?data=` request) for restaurants/cafés/fast-food within ~1.6 km, sorted
-  nearest-first. The `nearbyModal` picker lets you select spots; `applyNearby()` drops them into a
-  dedicated **"Nearby"** place and switches to it, so the wheel/history/celebration work on real
-  nearby restaurants. Attribution (© OpenStreetMap contributors) is shown in the picker.
+  `runNearbySearch(lat,lng,radius)` calls `searchNearbyRestaurants()`, which queries
+  **OpenStreetMap's Overpass API** (keyless, CORS-OK, via a "simple" GET `?data=` request) for
+  restaurants/cafés/fast-food, sorted nearest-first. The `nearbyModal` picker has a **distance
+  selector** (1/3/5 km — re-queries; resolved position is cached so it never re-prompts) and a
+  client-side **type filter** (`nearbyFiltered`: restaurants/fast-food/cafés). `applyNearby()`
+  drops the selected spots into a dedicated **"Nearby"** place and switches to it, so the
+  wheel/history/celebration work on real restaurants. Each nearby food carries its `lat`/`lng`
+  (→ a **"Open in Maps"** link on the winner) and a cuisine-based `imageQuery` (the heal effect
+  searches `imageQuery || name`, so tiles show a relevant photo). Attribution (© OpenStreetMap
+  contributors) is shown in the picker.
 - **Persistence** — `{ activePlaceId, places }` → `localStorage` key `wfd-places-v1` via
   `bootstrapPlaces()` (migrates an old flat `wfd-foods` list into a "Home" place); history →
   `wfd-history`; spin prefs → `wfd-muted`, `wfd-variety`, `wfd-knockout`, `wfd-round`.
