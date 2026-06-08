@@ -113,6 +113,12 @@ disabled/neutralised under `prefers-reduced-motion`. The aesthetic is deliberate
   "📌 Pin here" saves `coords` on the active place; "📍 Use my location" auto-switches to the
   nearest pinned place within `GEO_RADIUS_M` (250 m) via `distanceMeters()`. **Only works over
   HTTPS or localhost** (dev + GitHub Pages, not plain HTTP).
+- **Nearby restaurants** — "🍴 Near me" (`handleNearby`) gets the user's position, then
+  `searchNearbyRestaurants(lat,lng)` queries **OpenStreetMap's Overpass API** (keyless, CORS-OK,
+  via a "simple" GET `?data=` request) for restaurants/cafés/fast-food within ~1.6 km, sorted
+  nearest-first. The `nearbyModal` picker lets you select spots; `applyNearby()` drops them into a
+  dedicated **"Nearby"** place and switches to it, so the wheel/history/celebration work on real
+  nearby restaurants. Attribution (© OpenStreetMap contributors) is shown in the picker.
 - **Persistence** — `{ activePlaceId, places }` → `localStorage` key `wfd-places-v1` via
   `bootstrapPlaces()` (migrates an old flat `wfd-foods` list into a "Home" place); history →
   `wfd-history`; spin prefs → `wfd-muted`, `wfd-variety`, `wfd-knockout`, `wfd-round`.

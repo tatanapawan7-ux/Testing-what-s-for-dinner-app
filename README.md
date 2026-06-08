@@ -12,6 +12,8 @@ a celebratory winner modal and a persistent history of past spins.
   optional haptic buzz on mobile
 - 📍 **Location profiles** — separate menus per place (Home, Mall, Work…), with optional
   GPS "use my location" auto-switch to the nearest place you've pinned
+- 🍴 **Restaurants near me** — pull real nearby restaurants from OpenStreetMap (keyless, free)
+  and spin the wheel among them to decide where to eat out
 - ➕ **Menu management** — add/remove dishes per place; adding a dish shows a **photo picker**
   of matching images (TheMealDB + Openverse) so the picture fits the food — or paste your own
   image link, and change any dish's photo later

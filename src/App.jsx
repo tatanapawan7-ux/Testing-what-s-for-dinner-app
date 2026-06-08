@@ -197,6 +197,55 @@ function distanceMeters(a, b) {
 
 const GEO_RADIUS_M = 250 // how close you must be to auto-switch to a pinned place
 
+// Human-readable distance.
+function formatDistance(m) {
+  return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`
+}
+
+// Nearby eateries from OpenStreetMap via the keyless, CORS-friendly Overpass API
+// (GET ?data= is a "simple" request — no preflight). Returns
+// [{ name, cuisine|null, kind, dist }] sorted nearest-first; throws on network
+// failure so the caller can show an error state.
+async function searchNearbyRestaurants(lat, lng, radius = 1600) {
+  const query = `[out:json][timeout:20];
+(
+  node["amenity"~"^(restaurant|fast_food|cafe)$"](around:${radius},${lat},${lng});
+  way["amenity"~"^(restaurant|fast_food|cafe)$"](around:${radius},${lat},${lng});
+);
+out center 60;`
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), 20000)
+  try {
+    const res = await fetch(
+      `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+      { signal: ctrl.signal },
+    )
+    if (!res.ok) throw new Error(`Overpass HTTP ${res.status}`)
+    const data = await res.json()
+    const seen = new Set()
+    const results = []
+    for (const el of data.elements ?? []) {
+      const name = el.tags?.name
+      const elat = el.lat ?? el.center?.lat
+      const elng = el.lon ?? el.center?.lon
+      if (!name || elat == null || elng == null) continue
+      const key = name.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      results.push({
+        name,
+        cuisine: el.tags.cuisine ? el.tags.cuisine.split(/[;,]/)[0].replace(/_/g, ' ') : null,
+        kind: el.tags.amenity,
+        dist: distanceMeters({ lat, lng }, { lat: elat, lng: elng }),
+      })
+    }
+    results.sort((a, b) => a.dist - b.dist)
+    return results
+  } finally {
+    clearTimeout(t)
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Misc                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -378,6 +427,8 @@ export default function App() {
   const [photoPicker, setPhotoPicker] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null) // food pending removal
   const [confirmClearHistory, setConfirmClearHistory] = useState(false) // history wipe pending
+  // Nearby-restaurants picker: { status:'loading'|'ok'|'empty'|'error', results, selected: string[] }
+  const [nearbyModal, setNearbyModal] = useState(null)
   const [muted, setMuted] = useState(() => loadState('wfd-muted', false))
   const [shareCopied, setShareCopied] = useState(false) // brief "copied!" feedback
 
@@ -434,13 +485,14 @@ export default function App() {
       if (e.key !== 'Escape') return
       if (photoPicker) setPhotoPicker(null)
       else if (placeModal) setPlaceModal(null)
+      else if (nearbyModal) setNearbyModal(null)
       else if (confirmDelete) setConfirmDelete(null)
       else if (confirmClearHistory) setConfirmClearHistory(false)
       else if (winner) setWinner(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [photoPicker, placeModal, confirmDelete, confirmClearHistory, winner])
+  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, winner])
 
   /* ------------------------------- Derived -------------------------------- */
   const activePlace = useMemo(
@@ -680,6 +732,56 @@ export default function App() {
       setPlaces((prev) => prev.map((p) => (p.id === activePlace.id ? { ...p, coords: here } : p)))
       setStatus(`📌 Pinned ${activePlace.emoji} ${activePlace.name} to your location.`)
     })
+  }
+
+  // Find eateries around the user's current location, then open the picker.
+  function handleNearby() {
+    withPosition((here) => {
+      setNearbyModal({ status: 'loading', results: [], selected: [] })
+      searchNearbyRestaurants(here.lat, here.lng)
+        .then((results) =>
+          setNearbyModal({
+            status: results.length ? 'ok' : 'empty',
+            results,
+            selected: results.slice(0, 10).map((r) => r.name),
+          }),
+        )
+        .catch(() => setNearbyModal({ status: 'error', results: [], selected: [] }))
+    })
+  }
+
+  // Toggle a restaurant in the picker's selection.
+  function toggleNearby(name) {
+    setNearbyModal((m) =>
+      m
+        ? {
+            ...m,
+            selected: m.selected.includes(name)
+              ? m.selected.filter((n) => n !== name)
+              : [...m.selected, name],
+          }
+        : m,
+    )
+  }
+
+  // Drop the chosen restaurants into a dedicated "Nearby" place and switch to it,
+  // so the existing wheel/spin/history all work on real nearby spots.
+  function applyNearby() {
+    const chosen = nearbyModal.results.filter((r) => nearbyModal.selected.includes(r.name))
+    if (!chosen.length) return
+    const foods = chosen.map((r) => makeFood(r.name))
+    const existing = places.find((p) => p.name === 'Nearby')
+    if (existing) {
+      setPlaces((prev) => prev.map((p) => (p.id === existing.id ? { ...p, foods } : p)))
+      setActivePlaceId(existing.id)
+    } else {
+      const place = makePlace('Nearby', '🍴')
+      place.foods = foods
+      setPlaces((prev) => [...prev, place])
+      setActivePlaceId(place.id)
+    }
+    setNearbyModal(null)
+    setStatus(`🍴 Added ${foods.length} nearby ${foods.length === 1 ? 'spot' : 'spots'} to spin`)
   }
 
   /* --------------------------- Spin tick sounds -------------------------- */
@@ -955,6 +1057,13 @@ export default function App() {
               className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink/80 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-terra/40 hover:shadow-md disabled:opacity-60"
             >
               📌 Pin here
+            </button>
+            <button
+              onClick={handleNearby}
+              disabled={locating}
+              className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink/80 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-terra/40 hover:shadow-md disabled:opacity-60"
+            >
+              🍴 Near me
             </button>
           </div>
           {status && (
@@ -1670,6 +1779,108 @@ export default function App() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restaurants near me (OpenStreetMap) */}
+      {nearbyModal && (
+        <div
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-[#2c2520]/45 p-4 backdrop-blur-sm"
+          onClick={() => setNearbyModal(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="nearby-title"
+            className="animate-pop-in flex max-h-[85vh] w-full max-w-md flex-col rounded-3xl border border-line bg-surface p-6 shadow-pop"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="nearby-title" className="font-display text-xl font-semibold text-ink">
+              Restaurants near you
+            </h3>
+            <p className="mb-4 mt-1 text-sm text-muted">
+              From OpenStreetMap. Pick the spots you&apos;d consider, then spin to decide.
+            </p>
+
+            {nearbyModal.status === 'loading' && (
+              <div className="flex h-40 items-center justify-center text-muted">
+                Finding restaurants near you…
+              </div>
+            )}
+
+            {(nearbyModal.status === 'empty' || nearbyModal.status === 'error') && (
+              <p className="rounded-xl border border-line bg-cream px-4 py-6 text-center text-sm text-muted">
+                {nearbyModal.status === 'error'
+                  ? 'Couldn’t reach the restaurant search. Please try again.'
+                  : 'No restaurants found nearby. Try again from a different spot.'}
+              </p>
+            )}
+
+            {nearbyModal.status === 'ok' && (
+              <div className="-mx-1 flex-1 space-y-1.5 overflow-y-auto px-1">
+                {nearbyModal.results.map((r) => {
+                  const on = nearbyModal.selected.includes(r.name)
+                  const tags = [
+                    r.cuisine,
+                    r.kind === 'cafe' ? 'café' : r.kind === 'fast_food' ? 'fast food' : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+                  return (
+                    <button
+                      key={`${r.name}-${Math.round(r.dist)}`}
+                      onClick={() => toggleNearby(r.name)}
+                      aria-pressed={on}
+                      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-200 ${
+                        on
+                          ? 'border-terra/50 bg-terra/5'
+                          : 'border-line bg-cream hover:border-terra/30'
+                      }`}
+                    >
+                      <span
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-xs ${
+                          on ? 'border-terra bg-terra text-white' : 'border-line text-transparent'
+                        }`}
+                      >
+                        ✓
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium text-ink">{r.name}</span>
+                        <span className="block truncate text-xs capitalize text-muted">
+                          {tags || 'restaurant'}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-xs font-medium text-muted">
+                        {formatDistance(r.dist)}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="mt-5 flex items-center gap-2">
+              <button
+                onClick={applyNearby}
+                disabled={nearbyModal.status !== 'ok' || nearbyModal.selected.length === 0}
+                className="flex-1 rounded-xl bg-gradient-to-br from-terra to-terra-light px-4 py-3 font-semibold text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 disabled:hover:translate-y-0"
+              >
+                {nearbyModal.status === 'ok' && nearbyModal.selected.length > 0
+                  ? `Add ${nearbyModal.selected.length} to spin`
+                  : 'Add to spin'}
+              </button>
+              <button
+                onClick={() => setNearbyModal(null)}
+                className="rounded-xl border border-line bg-cream px-4 py-3 font-medium text-ink/70 transition-all duration-300 hover:bg-line/40"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <p className="mt-3 text-center text-[11px] text-muted/70">
+              Data © OpenStreetMap contributors
+            </p>
           </div>
         </div>
       )}
