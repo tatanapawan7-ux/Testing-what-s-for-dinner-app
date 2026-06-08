@@ -35,8 +35,9 @@ The whole app is one component, `src/App.jsx`; state lives in `useState` and is 
 
 React 19 · Vite 8 · JavaScript/JSX (**not** TypeScript) · Tailwind CSS v4 (`@tailwindcss/vite`)
 · ESLint (flat config). Fonts are self-hosted via `@fontsource-variable/space-grotesk` (display)
-and `@fontsource-variable/inter` (body), imported in `src/main.jsx`. Food images come from
-Openverse (keyless CC search). **No test runner yet** — Vitest + React Testing Library fits.
+and `@fontsource-variable/inter` (body), imported in `src/main.jsx`. Food images come from a
+keyless multi-source search (TheMealDB + Openverse). **No test runner yet** — Vitest + React
+Testing Library fits.
 
 ```bash
 npm install      # install deps
@@ -159,7 +160,7 @@ Prefer extending these existing helpers over duplicating logic.
   (theme tokens, keyframes, body background/grain).
 - `PascalCase` component files, `camelCase` helpers/variables.
 - Keep state local; introduce a store/router only if scope genuinely grows (and document it).
-- Route all food imagery through Openverse (`searchFoodImages`) and render via `<FoodImage>`.
+- Route all food imagery through `searchFoodImages` (TheMealDB + Openverse) and render via `<FoodImage>`.
 
 ## Git & Notes
 
