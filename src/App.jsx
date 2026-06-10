@@ -1,48 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import confetti from 'canvas-confetti'
-
-/* -------------------------------------------------------------------------- */
-/*  Food photography                                                          */
-/* -------------------------------------------------------------------------- */
-// Food photos come from Openverse (see `searchFoodImages`): the user picks one
-// when adding a dish, and seeded/default foods are healed from Openverse on
-// first view (see the heal effect in App). Until an image resolves — or if it
-// fails to load — `placeholderImage` renders a labelled tile.
-
-function hashString(str) {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i)
-    hash |= 0 // force 32-bit int
-  }
-  return Math.abs(hash)
-}
-
-// A guaranteed-to-render inline SVG, used whenever a remote photo fails to load
-// (dead id, rate-limited/hotlinked thumbnail, offline) so the UI never shows a
-// broken-image icon.
-function placeholderImage(name) {
-  const safe = (name || 'Food').slice(0, 16).replace(/[<>&]/g, '')
-  // Warm band (amber → terracotta) so placeholders fit the cream theme.
-  const hue = 14 + (hashString(name || 'food') % 42)
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">` +
-    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
-    `<stop offset="0" stop-color="hsl(${hue},58%,52%)"/>` +
-    `<stop offset="1" stop-color="hsl(${hue + 14},52%,38%)"/>` +
-    `</linearGradient></defs>` +
-    `<rect width="400" height="400" fill="url(#g)"/>` +
-    `<text x="200" y="215" font-family="system-ui,sans-serif" font-size="36" font-weight="bold" fill="white" text-anchor="middle">${safe}</text>` +
-    `</svg>`
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`
-}
-
-// True when a stored image can't be used as-is and should be (re)fetched: empty,
-// a non-string (older versions accidentally stored array indices), or a dead
-// `images.unsplash.com` URL from a previous version.
-function needsImage(img) {
-  return typeof img !== 'string' || img === '' || img.includes('images.unsplash.com')
-}
+import { placeholderImage, needsImage, searchFoodImages } from './lib/photos'
+import { uid, makeFood, makePlace, loadState, bootstrapPlaces } from './lib/storage'
+import { distanceMeters, formatDistance, GEO_RADIUS_M, searchNearbyRestaurants } from './lib/geo'
+import { weightedPick } from './lib/spin'
+import { buildBackup, validateBackup, applyBackup } from './lib/backup'
 
 // Food <img> that falls back to a placeholder on error / missing src and avoids
 // hotlink blocks via a no-referrer policy.
@@ -63,190 +25,7 @@ function FoodImage({ name, src, className }) {
   )
 }
 
-function uid(prefix) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-}
-
-function makeFood(name, image) {
-  // No image yet → null; the heal effect fills seeded foods from Openverse, and
-  // `placeholderImage` covers the gap. (Added foods pass the chosen photo.)
-  const clean = name.trim()
-  return { id: uid('food'), name: clean, image: image ?? null }
-}
-
-// --- Food photo search (no API key) ---
-// Results are { id, thumb (grid preview), full (stored/display image), title }.
-
-// TheMealDB — real food photography for common dishes (CORS-enabled, hotlink-ok).
-async function searchMealDb(query) {
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), 8000)
-  try {
-    const res = await fetch(
-      `https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(query)}`,
-      { signal: ctrl.signal },
-    )
-    if (!res.ok) throw new Error(`MealDB HTTP ${res.status}`)
-    const data = await res.json()
-    return (data.meals ?? [])
-      .map((m) => ({
-        id: `mdb-${m.idMeal}`,
-        thumb: m.strMealThumb,
-        full: m.strMealThumb,
-        title: m.strMeal || query,
-      }))
-      .filter((r) => r.thumb)
-  } finally {
-    clearTimeout(t)
-  }
-}
-
-// Openverse — Creative-Commons fallback covering anything TheMealDB lacks.
-async function searchOpenverse(query, count) {
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), 8000)
-  try {
-    const url = `https://api.openverse.org/v1/images/?q=${encodeURIComponent(
-      query,
-    )}&page_size=${count}&mature=false`
-    const res = await fetch(url, { signal: ctrl.signal })
-    if (!res.ok) throw new Error(`Openverse HTTP ${res.status}`)
-    const data = await res.json()
-    return (data.results ?? [])
-      .map((r) => {
-        const url = r.thumbnail || r.url
-        return { id: r.id, thumb: url, full: url, title: r.title || query }
-      })
-      .filter((r) => r.thumb)
-  } finally {
-    clearTimeout(t)
-  }
-}
-
-// Merge TheMealDB (preferred) + Openverse. Throws only when BOTH fail (network),
-// so callers can tell a true error from an empty result set.
-async function searchFoodImages(query, count = 8) {
-  const [mdb, ov] = await Promise.allSettled([
-    searchMealDb(query),
-    searchOpenverse(query, count),
-  ])
-  if (mdb.status === 'rejected' && ov.status === 'rejected') {
-    throw new Error('photo search failed')
-  }
-  const a = mdb.status === 'fulfilled' ? mdb.value : []
-  const b = ov.status === 'fulfilled' ? ov.value : []
-  const seen = new Set()
-  const merged = []
-  for (const r of [...a, ...b]) {
-    if (!r.thumb || seen.has(r.thumb)) continue
-    seen.add(r.thumb)
-    merged.push(r)
-    if (merged.length >= count) break
-  }
-  return merged
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Places (location profiles)                                                */
-/* -------------------------------------------------------------------------- */
-// A "place" is a named location with its own food list and an optional pinned
-// GPS coordinate used for the "use my location" auto-switch.
-function makePlace(name, emoji, foodNames = []) {
-  return {
-    id: uid('place'),
-    name: name.trim(),
-    emoji,
-    coords: null, // { lat, lng } once the user pins it
-    foods: foodNames.map((n) => makeFood(n)),
-  }
-}
-
 const EMOJI_CHOICES = ['🏠', '🛍️', '💼', '🏖️', '✈️', '🎬', '🏟️', '🏞️', '🎓', '☕', '🍽️', '🎉']
-
-// Build the initial places, migrating any pre-existing flat `wfd-foods` list
-// into a "Home" place so returning users keep their menu.
-function bootstrapPlaces() {
-  const saved = loadState('wfd-places-v1', null)
-  if (saved && Array.isArray(saved.places) && saved.places.length) return saved
-
-  const home = makePlace('Home', '🏠')
-  const oldFoods = loadState('wfd-foods', null)
-  home.foods =
-    Array.isArray(oldFoods) && oldFoods.length
-      ? oldFoods
-      : ['Pizza', 'Sushi', 'Burgers', 'Tacos', 'Thai'].map((n) => makeFood(n))
-
-  const mall = makePlace('Mall', '🛍️', ['Burgers', 'Ramen', 'Sushi', 'Pizza', 'Dumplings'])
-  const work = makePlace('Work', '💼', ['Salad', 'Sandwich', 'Curry', 'Noodles'])
-
-  return { activePlaceId: home.id, places: [home, mall, work] }
-}
-
-// Haversine distance in metres between two { lat, lng } points.
-function distanceMeters(a, b) {
-  const R = 6371000
-  const toRad = (d) => (d * Math.PI) / 180
-  const dLat = toRad(b.lat - a.lat)
-  const dLng = toRad(b.lng - a.lng)
-  const lat1 = toRad(a.lat)
-  const lat2 = toRad(b.lat)
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
-  return 2 * R * Math.asin(Math.sqrt(h))
-}
-
-const GEO_RADIUS_M = 250 // how close you must be to auto-switch to a pinned place
-
-// Human-readable distance.
-function formatDistance(m) {
-  return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`
-}
-
-// Nearby eateries from OpenStreetMap via the keyless, CORS-friendly Overpass API
-// (GET ?data= is a "simple" request — no preflight). Returns
-// [{ name, cuisine|null, kind, dist }] sorted nearest-first; throws on network
-// failure so the caller can show an error state.
-async function searchNearbyRestaurants(lat, lng, radius = 1600) {
-  const query = `[out:json][timeout:20];
-(
-  node["amenity"~"^(restaurant|fast_food|cafe)$"](around:${radius},${lat},${lng});
-  way["amenity"~"^(restaurant|fast_food|cafe)$"](around:${radius},${lat},${lng});
-);
-out center 60;`
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), 20000)
-  try {
-    const res = await fetch(
-      `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
-      { signal: ctrl.signal },
-    )
-    if (!res.ok) throw new Error(`Overpass HTTP ${res.status}`)
-    const data = await res.json()
-    const seen = new Set()
-    const results = []
-    for (const el of data.elements ?? []) {
-      const name = el.tags?.name
-      const elat = el.lat ?? el.center?.lat
-      const elng = el.lon ?? el.center?.lon
-      if (!name || elat == null || elng == null) continue
-      const key = name.toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      results.push({
-        name,
-        cuisine: el.tags.cuisine ? el.tags.cuisine.split(/[;,]/)[0].replace(/_/g, ' ') : null,
-        kind: el.tags.amenity,
-        lat: elat,
-        lng: elng,
-        dist: distanceMeters({ lat, lng }, { lat: elat, lng: elng }),
-      })
-    }
-    results.sort((a, b) => a.dist - b.dist)
-    return results
-  } finally {
-    clearTimeout(t)
-  }
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Misc                                                                      */
@@ -261,15 +40,6 @@ const WHEEL_COLORS = [
 const CONFETTI_COLORS = ['#d2703a', '#e0a458', '#8e9b7c', '#c98b6b', '#a6603c', '#fffdfa']
 
 const SPIN_MS = 4800
-
-function loadState(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
-}
 
 function formatDate(ts) {
   return new Date(ts).toLocaleString(undefined, {
@@ -391,24 +161,6 @@ function readWheelAngle(el) {
   return deg
 }
 
-// Recency-weighted pick over candidate food indices: dishes appearing recently
-// in `historyNames` (lowercased, newest first) get lower weight, so the wheel
-// favours variety. Never-recent dishes get the highest weight.
-function weightedPick(pool, foods, historyNames) {
-  const recent = historyNames.slice(0, 30)
-  const weights = pool.map((i) => {
-    const idx = recent.indexOf(foods[i].name.toLowerCase())
-    return idx === -1 ? recent.length + 1 : idx + 1
-  })
-  const total = weights.reduce((a, b) => a + b, 0)
-  let r = Math.random() * total
-  for (let k = 0; k < pool.length; k++) {
-    r -= weights[k]
-    if (r <= 0) return pool[k]
-  }
-  return pool[pool.length - 1]
-}
-
 /* -------------------------------------------------------------------------- */
 /*  App                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -431,6 +183,8 @@ export default function App() {
   const [confirmClearHistory, setConfirmClearHistory] = useState(false) // history wipe pending
   // Nearby-restaurants picker: { status:'loading'|'ok'|'empty'|'error', results, selected: string[] }
   const [nearbyModal, setNearbyModal] = useState(null)
+  const [importConfirm, setImportConfirm] = useState(null) // parsed backup awaiting confirm
+  const [backupMsg, setBackupMsg] = useState('') // inline feedback by the footer buttons
   const [muted, setMuted] = useState(() => loadState('wfd-muted', false))
   const [shareCopied, setShareCopied] = useState(false) // brief "copied!" feedback
 
@@ -480,6 +234,11 @@ export default function App() {
     const t = setTimeout(() => setStatus(''), 3500)
     return () => clearTimeout(t)
   }, [status])
+  useEffect(() => {
+    if (!backupMsg) return
+    const t = setTimeout(() => setBackupMsg(''), 3500)
+    return () => clearTimeout(t)
+  }, [backupMsg])
 
   // Close whichever overlay is open on Escape (innermost first).
   useEffect(() => {
@@ -490,11 +249,12 @@ export default function App() {
       else if (nearbyModal) setNearbyModal(null)
       else if (confirmDelete) setConfirmDelete(null)
       else if (confirmClearHistory) setConfirmClearHistory(false)
+      else if (importConfirm) setImportConfirm(null)
       else if (winner) setWinner(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, winner])
+  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, winner])
 
   /* ------------------------------- Derived -------------------------------- */
   const activePlace = useMemo(
@@ -972,6 +732,45 @@ export default function App() {
     setConfirmClearHistory(false)
   }
 
+  /* ----------------------------- Backup actions --------------------------- */
+  // Download everything (places, history, prefs) as one JSON file.
+  function exportData() {
+    const blob = new Blob([JSON.stringify(buildBackup(), null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `whats-for-dinner-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setBackupMsg('Backup downloaded.')
+  }
+
+  // Parse + validate a chosen backup file, then ask before overwriting.
+  async function handleImportFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-picking the same file
+    if (!file) return
+    let data
+    try {
+      data = JSON.parse(await file.text())
+    } catch {
+      setBackupMsg('That file isn’t valid JSON.')
+      return
+    }
+    const problem = validateBackup(data)
+    if (problem) {
+      setBackupMsg(problem)
+      return
+    }
+    setImportConfirm(data)
+  }
+
+  // Write the backup and reload so all state rehydrates consistently.
+  function confirmImport() {
+    applyBackup(importConfirm)
+    window.location.reload()
+  }
+
   // Lightweight dinner stats derived from history — a sticky, fun summary.
   const stats = useMemo(() => {
     const counts = new Map()
@@ -1439,6 +1238,25 @@ export default function App() {
         </section>
 
         <footer className="pb-4 pt-2 text-center text-xs text-muted/70">
+          <div className="mb-2 flex items-center justify-center gap-3">
+            <button
+              onClick={exportData}
+              className="font-medium text-muted underline-offset-2 transition-colors hover:text-ink hover:underline"
+            >
+              Export data
+            </button>
+            <span aria-hidden="true">·</span>
+            <label className="cursor-pointer font-medium text-muted underline-offset-2 transition-colors hover:text-ink hover:underline">
+              Import data
+              <input
+                type="file"
+                accept="application/json,.json"
+                onChange={handleImportFile}
+                className="sr-only"
+              />
+            </label>
+          </div>
+          {backupMsg && <p className="animate-fade-in mb-2 font-medium text-terra">{backupMsg}</p>}
           Built with React + Vite + Tailwind · Photos from TheMealDB &amp; Openverse
         </footer>
       </div>
@@ -1979,6 +1797,47 @@ export default function App() {
             <p className="mt-3 text-center text-[11px] text-muted/70">
               Data © OpenStreetMap contributors
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm import backup (overwrites current data) */}
+      {importConfirm && (
+        <div
+          className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-[#2c2520]/45 p-4 backdrop-blur-sm"
+          onClick={() => setImportConfirm(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="import-title"
+            className="animate-pop-in w-full max-w-sm rounded-3xl border border-line bg-surface p-6 text-center shadow-pop"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="import-title" className="font-display text-xl font-semibold text-ink">
+              Restore this backup?
+            </h3>
+            <p className="mt-2 text-sm text-muted">
+              It contains {importConfirm['wfd-places-v1'].places.length}{' '}
+              {importConfirm['wfd-places-v1'].places.length === 1 ? 'place' : 'places'} and{' '}
+              {(importConfirm['wfd-history'] ?? []).length} history{' '}
+              {(importConfirm['wfd-history'] ?? []).length === 1 ? 'entry' : 'entries'}. Your
+              current places, menus, and history will be replaced.
+            </p>
+            <div className="mt-6 flex items-center gap-2">
+              <button
+                onClick={confirmImport}
+                className="flex-1 rounded-xl bg-gradient-to-br from-terra to-terra-light px-4 py-3 font-semibold text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+              >
+                Restore
+              </button>
+              <button
+                onClick={() => setImportConfirm(null)}
+                className="flex-1 rounded-xl border border-line bg-cream px-4 py-3 font-medium text-ink/70 transition-all duration-300 hover:bg-line/40"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

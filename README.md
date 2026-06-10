@@ -22,6 +22,8 @@ a celebratory winner modal and a persistent history of past spins.
 - 📊 **Dinner stats** — total decided, eaten, and your top pick, summarised at a glance
 - 🕑 **Dinner history** timeline (tagged by place), persisted in `localStorage`; remove a
   single spin or clear the whole log
+- 💾 **Backup & restore** — export all your places, menus, and history as a JSON file and
+  import it on any device (footer links)
 - ♿ **Accessible** — labelled dialogs, Escape-to-close, screen-reader winner announcements,
   and `prefers-reduced-motion` support
 - 📲 **Installable PWA** — add it to your home screen for an app-like, full-screen experience
@@ -58,10 +60,12 @@ npm run dev      # http://localhost:5173
 | `npm run build` | Production build to `dist/` |
 | `npm run preview` | Preview the production build |
 | `npm run lint` | Run ESLint |
+| `npm test` | Run the Vitest suite |
 
 ## Project Notes
 
-The whole app lives in `src/App.jsx`. See [`CLAUDE.md`](./CLAUDE.md) for architecture,
+The UI lives in `src/App.jsx`; pure logic (photo search, storage, geolocation, picking,
+backup) lives in tested `src/lib/` modules. See [`CLAUDE.md`](./CLAUDE.md) for architecture,
 conventions, and the Tailwind v4 setup.
 
 Food imagery comes from TheMealDB and Openverse (no API key required), with a graceful

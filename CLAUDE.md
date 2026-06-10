@@ -28,16 +28,20 @@ is celebrated in a modal. Foods are grouped into **location profiles** ("places"
 Mall, Work), each with its own menu — switch manually or tap "use my location" to auto-switch
 to the nearest GPS-pinned place. A persistent **dinner history** logs past spins.
 
-The whole app is one component, `src/App.jsx`; state lives in `useState` and is mirrored to
-`localStorage` so places, menus, and history survive refreshes.
+All UI lives in one component, `src/App.jsx`; pure logic (photos, storage, geo, spin picking,
+backup) lives in small `src/lib/` modules with colocated tests. The tree is wrapped in
+`src/ErrorBoundary.jsx` so a render crash shows a recovery card instead of a blank page.
+State lives in `useState` and is mirrored to `localStorage` so places, menus, and history
+survive refreshes.
 
 ## Tech Stack & Commands
 
 React 19 · Vite 8 · JavaScript/JSX (**not** TypeScript) · Tailwind CSS v4 (`@tailwindcss/vite`)
 · ESLint (flat config). Fonts are self-hosted via `@fontsource-variable/space-grotesk` (display)
 and `@fontsource-variable/inter` (body), imported in `src/main.jsx`. Food images come from a
-keyless multi-source search (TheMealDB + Openverse). **No test runner yet** — Vitest + React
-Testing Library fits.
+keyless multi-source search (TheMealDB + Openverse). Tests run on **Vitest** (plain Node env,
+no jsdom) and live next to the code they cover (`src/lib/*.test.js`); network calls are
+stubbed via `vi.stubGlobal('fetch', …)` and storage via a stubbed `localStorage`.
 
 ```bash
 npm install      # install deps
@@ -45,9 +49,11 @@ npm run dev      # dev server with hot reload
 npm run build    # production build to dist/
 npm run preview  # serve the production build
 npm run lint     # ESLint
+npm test         # Vitest (single run)
 ```
 
-Always run `npm run build` and `npm run lint` before committing — both must pass.
+Always run `npm run build`, `npm run lint`, and `npm test` before committing — all must pass.
+CI (the deploy workflow) runs lint + tests before building, so a failure blocks the deploy.
 
 ## Project Structure
 
@@ -64,9 +70,16 @@ public/
   og.png                 # 1200x630 social-share card
   manifest.webmanifest   # installable PWA manifest
 src/
-  main.jsx            # React root; imports ./index.css
-  App.jsx             # the entire application
+  main.jsx            # React root; wraps App in ErrorBoundary; imports ./index.css
+  App.jsx             # all components + app state
+  ErrorBoundary.jsx   # class component (required by React) — crash recovery card
   index.css           # @import "tailwindcss" + custom keyframes
+  lib/                # pure logic, each with a colocated *.test.js
+    photos.js            # placeholderImage, needsImage, searchFoodImages (TheMealDB+Openverse)
+    storage.js           # uid, makeFood, makePlace, loadState, bootstrapPlaces
+    geo.js               # distanceMeters, formatDistance, searchNearbyRestaurants (Overpass)
+    spin.js              # weightedPick
+    backup.js            # buildBackup, validateBackup, applyBackup (export/import)
 ```
 
 The icon set + `og.png` were generated from hand-written SVG via `sharp` (a one-off
@@ -148,6 +161,10 @@ disabled/neutralised under `prefers-reduced-motion`. The aesthetic is deliberate
   entry has a ✕ to remove just that spin (`removeHistoryEntry`); a confirm-gated **Clear all**
   in the section header wipes the whole log (`clearHistory`). A compact 3-up **stats** strip
   (`stats` memo: total decided, eaten, top pick) sits above the list when history is non-empty.
+- **Backup** — "Export data" in the footer downloads all `wfd-*` keys as one JSON file
+  (`buildBackup`); "Import data" parses + `validateBackup`s a chosen file, confirms via a
+  modal (it overwrites), then `applyBackup` writes storage and reloads so all state
+  rehydrates consistently.
 - **Installable (PWA)** — `public/manifest.webmanifest` (standalone, themed) + icon set + apple
   touch icon make it home-screen installable; `index.html` carries description + OG/Twitter meta
   (absolute `og.png`). All `public/` paths and the Vite `base` are **relative** (`./`) so they
@@ -165,7 +182,9 @@ Prefer extending these existing helpers over duplicating logic.
 
 ## Conventions
 
-- JavaScript + JSX only; functional components + hooks (no TS, no class components).
+- JavaScript + JSX only; functional components + hooks (no TS; the sole class component is
+  `ErrorBoundary`, which React requires to be a class).
+- Pure logic goes in `src/lib/` with a colocated Vitest test; components stay in `App.jsx`.
 - Styling is Tailwind utility classes inline, using the `@theme` tokens (`bg-terra`, `text-ink`,
   `border-line`, `font-display`, …); use `src/index.css` only for what utilities can't express
   (theme tokens, keyframes, body background/grain).
@@ -177,6 +196,7 @@ Prefer extending these existing helpers over duplicating logic.
 
 - Work on **feature branches**; clear, descriptive commits (Conventional Commits encouraged).
   Don't push to the default branch — open a PR when ready.
-- The app is intentionally **one component**. If it grows, first split `App.jsx` into
-  `components/` (Wheel, FoodManager, History, WinnerModal) + a `lib/` for helpers.
+- Pure helpers are already split into `src/lib/` (tested). The UI is intentionally still
+  **one component**; if it keeps growing, the next step is splitting `App.jsx` into
+  `components/` (Wheel, FoodManager, History, WinnerModal, modals).
 - After any significant change, **update this file** to match reality.
