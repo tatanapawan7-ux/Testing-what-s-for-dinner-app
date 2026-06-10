@@ -28,11 +28,12 @@ is celebrated in a modal. Foods are grouped into **location profiles** ("places"
 Mall, Work), each with its own menu — switch manually or tap "use my location" to auto-switch
 to the nearest GPS-pinned place. A persistent **dinner history** logs past spins.
 
-All UI lives in one component, `src/App.jsx`; pure logic (photos, storage, geo, spin picking,
-backup) lives in small `src/lib/` modules with colocated tests. The tree is wrapped in
-`src/ErrorBoundary.jsx` so a render crash shows a recovery card instead of a blank page.
-State lives in `useState` and is mirrored to `localStorage` so places, menus, and history
-survive refreshes.
+`src/App.jsx` owns all state and handlers and composes the UI from presentational
+`src/components/` (each takes props, no own persistent state); pure logic (photos, storage,
+geo, spin picking, backup) lives in small `src/lib/` modules with colocated tests. The tree
+is wrapped in `src/ErrorBoundary.jsx` so a render crash shows a recovery card instead of a
+blank page. State lives in `useState` and is mirrored to `localStorage` so places, menus,
+and history survive refreshes.
 
 ## Tech Stack & Commands
 
@@ -71,14 +72,28 @@ public/
   manifest.webmanifest   # installable PWA manifest
 src/
   main.jsx            # React root; wraps App in ErrorBoundary; imports ./index.css
-  App.jsx             # all components + app state
+  App.jsx             # state + handlers + composition (header, footer, modals wiring)
   ErrorBoundary.jsx   # class component (required by React) — crash recovery card
   index.css           # @import "tailwindcss" + custom keyframes
+  components/         # presentational components (props in, callbacks out)
+    Modal.jsx            # shared dialog shell: backdrop, ARIA, focus trap
+    ConfirmModal.jsx     # generic confirm dialog (danger/primary tones)
+    FoodImage.jsx        # <img> with placeholder fallback + no-referrer
+    Wheel.jsx            # disc, pointer, spin hub, variety/knock-out controls
+    PlaceBar.jsx         # place chips + location actions + status toast
+    Menu.jsx             # add-a-dish form + food card grid (rename/photo/delete)
+    History.jsx          # stats strip + history timeline
+    WinnerModal.jsx      # celebration dialog (share, maps link, spin again)
+    PlaceModal.jsx       # add/edit place (name, emoji, pin clearing)
+    PhotoPicker.jsx      # photo search results + paste-a-link
+    NearbyModal.jsx      # OSM restaurant picker (radius + type filters)
+    RenameModal.jsx      # rename a dish (duplicate-blocked)
   lib/                # pure logic, each with a colocated *.test.js
     photos.js            # placeholderImage, needsImage, searchFoodImages (TheMealDB+Openverse)
     storage.js           # uid, makeFood, makePlace, loadState, bootstrapPlaces
     geo.js               # distanceMeters, formatDistance, searchNearbyRestaurants (Overpass)
-    spin.js              # weightedPick
+    spin.js              # weightedPick, readWheelAngle, SPIN_MS
+    feedback.js          # celebrate (confetti), vibrate, Web Audio sounds (untested: browser-only)
     backup.js            # buildBackup, validateBackup, applyBackup (export/import)
 ```
 
@@ -173,10 +188,15 @@ disabled/neutralised under `prefers-reduced-motion`. The aesthetic is deliberate
   asks via a confirm dialog (`confirmDelete`) and is blocked below 2 items, spin disabled while
   spinning or under 2 options, empty place shows a hint. Two
   auto-clearing toasts: `error` (validation, by the wheel) and `status` (location, by the bar).
-- **Accessibility** — every modal is a labelled `role="dialog"` (`aria-modal`, `aria-labelledby`)
-  and a window-level Escape handler closes whichever overlay is open (innermost first). The spin
-  winner is announced to screen readers via a visually-hidden (`sr-only`) `aria-live="assertive"`
-  region. Motion is gated on `prefers-reduced-motion` (see Tailwind/CSS notes).
+- **Accessibility** — every modal renders through the shared `Modal` shell: labelled
+  `role="dialog"` (`aria-modal`, `aria-labelledby`) plus a **focus trap** (focus moves in on
+  open, Tab cycles within, and returns to the opener on close). A window-level Escape handler
+  closes whichever overlay is open (innermost first). The spin winner is announced to screen
+  readers via a visually-hidden (`sr-only`) `aria-live="assertive"` region. Motion is gated on
+  `prefers-reduced-motion` (see Tailwind/CSS notes).
+- **Renaming a dish** — the ✎ on each menu card opens `RenameModal` (duplicate names in the
+  place are blocked, case-insensitively); `handleRename` updates the name and keeps id/photo.
+  Wheel labels shrink automatically on crowded wheels (9+ slices).
 
 Prefer extending these existing helpers over duplicating logic.
 
@@ -184,7 +204,10 @@ Prefer extending these existing helpers over duplicating logic.
 
 - JavaScript + JSX only; functional components + hooks (no TS; the sole class component is
   `ErrorBoundary`, which React requires to be a class).
-- Pure logic goes in `src/lib/` with a colocated Vitest test; components stay in `App.jsx`.
+- Pure logic goes in `src/lib/` with a colocated Vitest test. UI goes in `src/components/`
+  as presentational components (props in, callbacks out — no own persistent state); `App.jsx`
+  owns all state/handlers. New dialogs build on `Modal` (or `ConfirmModal` for confirms) to
+  inherit the backdrop, ARIA wiring, and focus trap for free.
 - Styling is Tailwind utility classes inline, using the `@theme` tokens (`bg-terra`, `text-ink`,
   `border-line`, `font-display`, …); use `src/index.css` only for what utilities can't express
   (theme tokens, keyframes, body background/grain).
@@ -196,7 +219,6 @@ Prefer extending these existing helpers over duplicating logic.
 
 - Work on **feature branches**; clear, descriptive commits (Conventional Commits encouraged).
   Don't push to the default branch — open a PR when ready.
-- Pure helpers are already split into `src/lib/` (tested). The UI is intentionally still
-  **one component**; if it keeps growing, the next step is splitting `App.jsx` into
-  `components/` (Wheel, FoodManager, History, WinnerModal, modals).
+- The codebase is fully split: state/handlers in `App.jsx`, presentation in
+  `src/components/`, tested pure logic in `src/lib/`. Keep new code in that shape.
 - After any significant change, **update this file** to match reality.

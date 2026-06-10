@@ -1,4 +1,18 @@
-// Winner-picking logic for the wheel.
+// Winner-picking + wheel-rotation logic.
+
+export const SPIN_MS = 4800
+
+// Read the wheel's current visual rotation (degrees, 0–360) from its transform.
+export function readWheelAngle(el) {
+  const t = el && getComputedStyle(el).transform
+  if (!t || t === 'none') return 0
+  const m = t.match(/matrix\(([^)]+)\)/)
+  if (!m) return 0
+  const [a, b] = m[1].split(',').map(Number)
+  let deg = (Math.atan2(b, a) * 180) / Math.PI
+  if (deg < 0) deg += 360
+  return deg
+}
 
 // Recency-weighted pick over candidate food indices: dishes appearing recently
 // in `historyNames` (lowercased, newest first) get lower weight, so the wheel

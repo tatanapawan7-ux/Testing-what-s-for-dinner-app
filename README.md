@@ -14,9 +14,9 @@ a celebratory winner modal and a persistent history of past spins.
   GPS "use my location" auto-switch to the nearest place you've pinned
 - 🍴 **Restaurants near me** — pull real nearby restaurants from OpenStreetMap (keyless, free)
   and spin the wheel among them to decide where to eat out
-- ➕ **Menu management** — add/remove dishes per place; adding a dish shows a **photo picker**
-  of matching images (TheMealDB + Openverse) so the picture fits the food — or paste your own
-  image link, and change any dish's photo later
+- ➕ **Menu management** — add, rename, or remove dishes per place; adding a dish shows a
+  **photo picker** of matching images (TheMealDB + Openverse) so the picture fits the food —
+  or paste your own image link, and change any dish's photo later
 - 🎉 **Winner modal** with a confetti burst + celebratory chime (sound has a mute toggle),
   and a **Share this pick** button (native share sheet → clipboard fallback)
 - 📊 **Dinner stats** — total decided, eaten, and your top pick, summarised at a glance
@@ -64,9 +64,9 @@ npm run dev      # http://localhost:5173
 
 ## Project Notes
 
-The UI lives in `src/App.jsx`; pure logic (photo search, storage, geolocation, picking,
-backup) lives in tested `src/lib/` modules. See [`CLAUDE.md`](./CLAUDE.md) for architecture,
-conventions, and the Tailwind v4 setup.
+State and handlers live in `src/App.jsx`, the UI in `src/components/`, and pure logic
+(photo search, storage, geolocation, picking, backup) in tested `src/lib/` modules. See
+[`CLAUDE.md`](./CLAUDE.md) for architecture, conventions, and the Tailwind v4 setup.
 
 Food imagery comes from TheMealDB and Openverse (no API key required), with a graceful
 placeholder when an image can't load.
