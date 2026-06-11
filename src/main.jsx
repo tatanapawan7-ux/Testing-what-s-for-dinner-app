@@ -5,6 +5,9 @@ import '@fontsource-variable/inter'
 import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
+import { initAnalytics } from './lib/analytics'
+
+initAnalytics()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

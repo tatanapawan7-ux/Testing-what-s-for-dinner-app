@@ -75,3 +75,20 @@ State and handlers live in `src/App.jsx`, the UI in `src/components/`, and pure 
 
 Food imagery comes from TheMealDB and Openverse (no API key required), with a graceful
 placeholder when an image can't load.
+
+## Analytics (optional, off by default)
+
+The app ships with **no tracker**. To enable privacy-friendly, cookieless page counts via
+[GoatCounter](https://www.goatcounter.com) (free):
+
+1. Create a free GoatCounter site — you'll get a `https://YOURCODE.goatcounter.com` URL.
+2. In the repo, add an **Actions variable** named `GOATCOUNTER` set to
+   `https://YOURCODE.goatcounter.com/count` (Settings → Secrets and variables → Actions →
+   Variables). The next deploy picks it up.
+
+It's loaded only when that variable is set and respects the browser's Do-Not-Track signal
+(see `src/lib/analytics.js`). No cookies, no personal data.
+
+## License
+
+[MIT](./LICENSE) © tatanapawan7-ux

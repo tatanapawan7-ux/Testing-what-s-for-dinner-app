@@ -2,7 +2,8 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [claude/claude-md-docs-uhg2p]
+    # `main` is listed so renaming the working branch to main keeps deploying.
+    branches: [main, claude/claude-md-docs-uhg2p]
   workflow_dispatch:
 
 # Allow the workflow to publish to GitHub Pages.
@@ -29,6 +30,10 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+        # Optional analytics: set a repo variable GOATCOUNTER to your
+        # https://YOURCODE.goatcounter.com/count endpoint to enable it.
+        env:
+          VITE_GOATCOUNTER: ${{ vars.GOATCOUNTER }}
       - uses: actions/configure-pages@v5
         with:
           enablement: true

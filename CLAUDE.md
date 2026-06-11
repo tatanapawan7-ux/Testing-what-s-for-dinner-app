@@ -97,6 +97,7 @@ src/
     feedback.js          # celebrate (confetti), vibrate, Web Audio sounds (untested: browser-only)
     backup.js            # buildBackup, validateBackup, applyBackup (export/import)
     sharecard.js         # canvas-rendered 1080² share PNG (untested: browser-only)
+    analytics.js         # optional GoatCounter loader, env-gated (untested: browser-only)
 ```
 
 The icon set + `og.png` were generated from hand-written SVG via `sharp` (a one-off
