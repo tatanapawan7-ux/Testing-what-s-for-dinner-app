@@ -22,7 +22,6 @@ import GroupModal from './components/GroupModal.jsx'
 import TagModal from './components/TagModal.jsx'
 import TagFilter from './components/TagFilter.jsx'
 import EditDishMenu from './components/EditDishMenu.jsx'
-import SpinHelpModal from './components/SpinHelpModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 
 /* -------------------------------------------------------------------------- */
@@ -52,7 +51,7 @@ export default function App() {
   const [renameTarget, setRenameTarget] = useState(null) // food being renamed
   const [tagTarget, setTagTarget] = useState(null) // food whose tags are being edited
   const [editDish, setEditDish] = useState(null) // food whose edit action sheet is open
-  const [spinHelp, setSpinHelp] = useState(false) // "what do these settings do?" popup
+  const [spinHint, setSpinHint] = useState('') // one-line hint shown when a toggle flips
   const [activeTags, setActiveTags] = useState([]) // wheel filter (transient, per place)
   // Group spin: { stage:'size' } → { stage:'veto', total, current, vetoed: [foodIds] }
   const [groupModal, setGroupModal] = useState(null)
@@ -136,6 +135,11 @@ export default function App() {
     const t = setTimeout(() => setBackupMsg(''), 3500)
     return () => clearTimeout(t)
   }, [backupMsg])
+  useEffect(() => {
+    if (!spinHint) return
+    const t = setTimeout(() => setSpinHint(''), 4000)
+    return () => clearTimeout(t)
+  }, [spinHint])
 
   // Close whichever overlay is open on Escape (innermost first).
   useEffect(() => {
@@ -151,13 +155,12 @@ export default function App() {
       else if (renameTarget) setRenameTarget(null)
       else if (tagTarget) setTagTarget(null)
       else if (editDish) setEditDish(null)
-      else if (spinHelp) setSpinHelp(false)
       else if (groupModal) setGroupModal(null)
       else if (winner) setWinner(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, importMenu, renameTarget, tagTarget, editDish, spinHelp, groupModal, winner])
+  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, importMenu, renameTarget, tagTarget, editDish, groupModal, winner])
 
   /* ------------------------------- Derived -------------------------------- */
   const activePlace = useMemo(
@@ -621,6 +624,36 @@ export default function App() {
     setTimeout(() => handleSpin(), 120)
   }
 
+  /* --------------------------- Spin-setting hints ------------------------- */
+  // Each toggle flip briefly explains what the new state means (under the row).
+  function toggleVariety() {
+    const next = !variety
+    setVariety(next)
+    setSpinHint(
+      next
+        ? 'Favor variety on — recent meals become less likely; ★ ratings and ♥ favorites count too.'
+        : 'Favor variety off — every dish has equal odds.',
+    )
+  }
+  function toggleKnockout() {
+    const next = !knockout
+    setKnockout(next)
+    setSpinHint(
+      next
+        ? 'Knock-out on — each winner is removed until every dish has had a turn.'
+        : 'Knock-out off — winners stay on the wheel.',
+    )
+  }
+  function toggleFavBoost() {
+    const next = !favBoost
+    setFavBoost(next)
+    setSpinHint(
+      next
+        ? 'Boost on — hearted dishes get double odds and wider slices.'
+        : 'Boost off — favorites are back to normal odds.',
+    )
+  }
+
   /* ------------------------------ Group spin ------------------------------ */
   // Pass-the-phone mode: each person may veto one dish, then the wheel spins
   // among what's left. Vetoes apply to that one spin only.
@@ -946,13 +979,13 @@ export default function App() {
           wheelRef={wheelRef}
           onSpin={handleSpin}
           onSpinEnd={handleSpinEnd}
-          onToggleVariety={() => setVariety((v) => !v)}
-          onToggleKnockout={() => setKnockout((k) => !k)}
-          onToggleFavBoost={() => setFavBoost((b) => !b)}
+          onToggleVariety={toggleVariety}
+          onToggleKnockout={toggleKnockout}
+          onToggleFavBoost={toggleFavBoost}
           onResetRound={resetRound}
           canGroup={wheelFoods.length >= 3 && !isSpinning}
           onGroupSpin={startGroupSpin}
-          onHelp={() => setSpinHelp(true)}
+          hint={spinHint}
         />
 
         <Menu
@@ -1129,9 +1162,6 @@ export default function App() {
       {tagTarget && (
         <TagModal target={tagTarget} onSave={handleTags} onClose={() => setTagTarget(null)} />
       )}
-
-      {/* What do the spin settings do? */}
-      {spinHelp && <SpinHelpModal onClose={() => setSpinHelp(false)} />}
 
       {/* Import a shared menu (from a #menu= link) */}
       {importMenu && (

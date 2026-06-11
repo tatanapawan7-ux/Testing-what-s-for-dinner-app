@@ -92,7 +92,6 @@ src/
     TagModal.jsx         # toggle a dish's tags
     TagFilter.jsx        # tag chips above the wheel (filter the spin set)
     EditDishMenu.jsx     # per-dish action sheet → rename / tags / change photo
-    SpinHelpModal.jsx    # ⓘ popup explaining the four spin controls
   lib/                # pure logic, each with a colocated *.test.js
     photos.js            # placeholderImage, needsImage, searchFoodImages (TheMealDB+Openverse)
     storage.js           # uid, makeFood, makePlace, loadState, bootstrapPlaces
@@ -173,9 +172,10 @@ by an inline script in `index.html` to avoid a flash, with `meta theme-color` ke
   top pointer. **Smarter picking** (`handleSpin`): builds an eligible index pool — excludes the
   immediate previous winner (`lastWinnerId`), and, in **knock-out** mode, foods already in
   `roundWon` (cleared by `resetRound`); then picks uniformly or, when **variety** is on, via
-  `weightedPick()` (recency-weighted from `history`). The toggles + a round status + a ⓘ help
-  button (opens `SpinHelpModal`, explaining all four controls) sit under the
-  wheel; the winner modal has a **Spin again** (`spinAgain`). `handleSpinEnd` reveals the winner
+  `weightedPick()` (recency-weighted from `history`). The toggles + a round status sit under the
+  wheel; flipping a toggle shows a one-line state-aware hint beneath the row (`spinHint`,
+  auto-clears) explaining what the new state means. The winner modal has a
+  **Spin again** (`spinAgain`). `handleSpinEnd` reveals the winner
   and logs history (tagged with the place), then
   celebrates: `celebrate()` fires a `canvas-confetti` burst (skipped under `prefers-reduced-motion`)
   and `playFanfare()` plays a Web Audio chime + a `vibrate()` haptic buzz — all gated by the

@@ -32,7 +32,7 @@ export default function Wheel({
   onResetRound,
   canGroup,
   onGroupSpin,
-  onHelp,
+  hint,
 }) {
   // Slice geometry (favorites get wider slices when the boost is on) and the
   // conic-gradient background built from it.
@@ -191,15 +191,16 @@ export default function Wheel({
         >
           👥 Group spin
         </button>
-        <button
-          onClick={onHelp}
-          aria-label="What do these settings do?"
-          title="What do these settings do?"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-sm font-semibold text-ink/60 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
-        >
-          ?
-        </button>
       </div>
+      {/* One-line explanation of whatever was just toggled (auto-clears). */}
+      {hint && (
+        <p
+          role="status"
+          className="animate-fade-in mt-3 max-w-sm text-center text-sm text-muted"
+        >
+          {hint}
+        </p>
+      )}
       {knockout && (
         <div className="mt-3 flex items-center justify-center gap-3 text-sm text-muted">
           {roundComplete ? (
