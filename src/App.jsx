@@ -42,6 +42,8 @@ export default function App() {
   const [backupMsg, setBackupMsg] = useState('') // inline feedback by the footer buttons
   const [renameTarget, setRenameTarget] = useState(null) // food being renamed
   const [muted, setMuted] = useState(() => loadState('wfd-muted', false))
+  // 'light' | 'dark' | null (= follow the system preference)
+  const [theme, setTheme] = useState(() => loadState('wfd-theme', null))
   const [shareCopied, setShareCopied] = useState(false) // brief "copied!" feedback
 
   // Smarter spinning
@@ -69,6 +71,19 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('wfd-muted', JSON.stringify(muted))
   }, [muted])
+  // Apply the theme: toggle the .dark class and keep browser chrome in sync.
+  const isDark =
+    theme === 'dark' ||
+    (theme !== 'light' &&
+      typeof matchMedia !== 'undefined' &&
+      matchMedia('(prefers-color-scheme: dark)').matches)
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDark)
+    localStorage.setItem('wfd-theme', JSON.stringify(theme))
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', isDark ? '#211a14' : '#f8f3ec')
+  }, [theme, isDark])
   useEffect(() => {
     localStorage.setItem('wfd-variety', JSON.stringify(variety))
   }, [variety])
@@ -653,15 +668,25 @@ export default function App() {
       </p>
 
       <div className="relative mx-auto flex max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
-        {/* Sound toggle */}
-        <button
-          onClick={() => setMuted((m) => !m)}
-          aria-label={muted ? 'Unmute sound' : 'Mute sound'}
-          title={muted ? 'Sound off' : 'Sound on'}
-          className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-base shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:right-6"
-        >
-          {muted ? '🔇' : '🔊'}
-        </button>
+        {/* Theme + sound toggles */}
+        <div className="absolute right-4 top-4 z-10 flex items-center gap-2 sm:right-6">
+          <button
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={isDark ? 'Light mode' : 'Dark mode'}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-base shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+          >
+            {isDark ? '☀️' : '🌙'}
+          </button>
+          <button
+            onClick={() => setMuted((m) => !m)}
+            aria-label={muted ? 'Unmute sound' : 'Mute sound'}
+            title={muted ? 'Sound off' : 'Sound on'}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-base shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+          >
+            {muted ? '🔇' : '🔊'}
+          </button>
+        </div>
 
         {/* Header */}
         <header className="animate-float-up text-center">

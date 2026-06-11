@@ -28,15 +28,33 @@ html {
   color-scheme: light;
 }
 
+/* Dark mode: a `.dark` class on <html> re-points the theme tokens, so every
+   token-based utility (bg-surface, text-ink, border-line, …) flips at once.
+   Warm "ember & cocoa" palette to mirror the cream theme's mood. */
+html.dark {
+  color-scheme: dark;
+  --color-cream: #211a14;
+  --color-cream-deep: #1a140f;
+  --color-surface: #2b231c;
+  --color-ink: #f0e7da;
+  --color-muted: #a3937f;
+  --color-line: #3c3128;
+  --color-sage: #8da077;
+}
+
 ::selection {
   background: rgba(194, 99, 47, 0.18);
   color: #2c2520;
 }
 
+.dark ::selection {
+  color: #f0e7da;
+}
+
 body {
   margin: 0;
-  background: #f8f3ec;
-  color: #2c2520;
+  background: var(--color-cream);
+  color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;

@@ -10,6 +10,20 @@
     />
     <meta name="theme-color" content="#f8f3ec" />
 
+    <!-- Apply the saved (or system) theme before first paint to avoid a flash. -->
+    <style>
+      html { background: #f8f3ec; }
+      html.dark { background: #211a14; }
+    </style>
+    <script>
+      try {
+        var t = JSON.parse(localStorage.getItem('wfd-theme'))
+        if (t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark')
+        }
+      } catch (e) { /* default to light */ }
+    </script>
+
     <!-- Icons & installability -->
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
@@ -29,7 +43,7 @@
     <meta name="twitter:description" content="Spin the wheel and let fate decide what's for dinner." />
     <meta name="twitter:image" content="https://tatanapawan7-ux.github.io/Testing-what-s-for-dinner-app/og.png" />
   </head>
-  <body style="background: #f8f3ec">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
