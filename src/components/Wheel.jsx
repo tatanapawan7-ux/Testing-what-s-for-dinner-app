@@ -145,30 +145,6 @@ export default function Wheel({
 
       {/* Smarter-spin settings */}
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-        <button
-          onClick={onToggleVariety}
-          aria-pressed={variety}
-          title="Recent meals become less likely (ratings & favorites count too)"
-          className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
-            variety
-              ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)]'
-              : 'border border-line bg-surface text-ink/70 shadow-sm hover:border-terra/40'
-          }`}
-        >
-          Favor variety
-        </button>
-        <button
-          onClick={onToggleKnockout}
-          aria-pressed={knockout}
-          title="Winners are removed until every dish has had a turn"
-          className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
-            knockout
-              ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)]'
-              : 'border border-line bg-surface text-ink/70 shadow-sm hover:border-terra/40'
-          }`}
-        >
-          Knock-out
-        </button>
         {showFavBoost && (
           <button
             onClick={onToggleFavBoost}
@@ -190,6 +166,30 @@ export default function Wheel({
           className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink/70 shadow-sm transition-all duration-300 hover:border-terra/40 disabled:opacity-50"
         >
           👥 Group spin
+        </button>
+        <button
+          onClick={onToggleVariety}
+          aria-pressed={variety}
+          title="Recent meals become less likely (ratings & favorites count too)"
+          className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
+            variety
+              ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)]'
+              : 'border border-line bg-surface text-ink/70 shadow-sm hover:border-terra/40'
+          }`}
+        >
+          ✨ Favor variety
+        </button>
+        <button
+          onClick={onToggleKnockout}
+          aria-pressed={knockout}
+          title="Winners are removed until every dish has had a turn"
+          className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
+            knockout
+              ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)]'
+              : 'border border-line bg-surface text-ink/70 shadow-sm hover:border-terra/40'
+          }`}
+        >
+          🎯 Knock-out
         </button>
       </div>
       {/* One-line explanation of whatever was just toggled (auto-clears). */}
