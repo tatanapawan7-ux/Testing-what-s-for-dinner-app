@@ -21,6 +21,7 @@ export default function Wheel({
   knockout,
   variety,
   error,
+  emptyLabel = 'Add some food below to fill the wheel',
   wheelRef,
   onSpin,
   onSpinEnd,
@@ -108,7 +109,7 @@ export default function Wheel({
 
             {foods.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center px-10 text-center text-sm text-white/90 [text-shadow:_0_1px_2px_rgb(60_36_20_/_45%)]">
-                Add some food below to fill the wheel
+                {emptyLabel}
               </div>
             )}
 

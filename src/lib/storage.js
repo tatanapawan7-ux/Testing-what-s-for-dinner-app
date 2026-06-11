@@ -8,7 +8,7 @@ export function makeFood(name, image) {
   // No image yet → null; the heal effect fills seeded foods on first view, and
   // `placeholderImage` covers the gap. (Added foods pass the chosen photo.)
   const clean = name.trim()
-  return { id: uid('food'), name: clean, image: image ?? null }
+  return { id: uid('food'), name: clean, image: image ?? null, tags: [] }
 }
 
 // A "place" is a named location with its own food list and an optional pinned

@@ -11,6 +11,7 @@ export default function Menu({
   onSubmit,
   onChangePhoto,
   onRename,
+  onEditTags,
   onDelete,
 }) {
   return (
@@ -56,28 +57,50 @@ export default function Menu({
                   ✓ picked
                 </span>
               )}
-              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/75 to-transparent px-3 py-2">
-                <span className="truncate text-sm font-semibold text-white drop-shadow">
-                  {food.name}
-                </span>
-                <span className="flex shrink-0 items-center gap-1.5">
-                  <button
-                    onClick={() => onRename(food)}
-                    aria-label={`Rename ${food.name}`}
-                    title="Rename"
-                    className="text-sm leading-none text-white opacity-90 transition-opacity duration-300 hover:opacity-100"
-                  >
-                    ✎
-                  </button>
-                  <button
-                    onClick={() => onChangePhoto(food.name, food.id)}
-                    aria-label={`Change photo for ${food.name}`}
-                    title="Change photo"
-                    className="text-base leading-none opacity-90 transition-opacity duration-300 hover:opacity-100"
-                  >
-                    🖼
-                  </button>
-                </span>
+              <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/80 to-transparent px-3 pb-2 pt-5">
+                {(food.tags?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {food.tags.map((t) => (
+                      <span
+                        key={t}
+                        className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-medium capitalize text-white backdrop-blur-sm"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-semibold text-white drop-shadow">
+                    {food.name}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      onClick={() => onRename(food)}
+                      aria-label={`Rename ${food.name}`}
+                      title="Rename"
+                      className="text-sm leading-none text-white opacity-90 transition-opacity duration-300 hover:opacity-100"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={() => onEditTags(food)}
+                      aria-label={`Tag ${food.name}`}
+                      title="Tags"
+                      className="text-sm leading-none opacity-90 transition-opacity duration-300 hover:opacity-100"
+                    >
+                      🏷
+                    </button>
+                    <button
+                      onClick={() => onChangePhoto(food.name, food.id)}
+                      aria-label={`Change photo for ${food.name}`}
+                      title="Change photo"
+                      className="text-base leading-none opacity-90 transition-opacity duration-300 hover:opacity-100"
+                    >
+                      🖼
+                    </button>
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => onDelete(food)}

@@ -23,10 +23,11 @@ describe('uid', () => {
 })
 
 describe('makeFood / makePlace', () => {
-  it('trims the name and defaults image to null', () => {
+  it('trims the name, defaults image to null, and starts with no tags', () => {
     const f = makeFood('  Ramen  ')
     expect(f.name).toBe('Ramen')
     expect(f.image).toBeNull()
+    expect(f.tags).toEqual([])
     expect(f.id).toMatch(/^food-/)
   })
 

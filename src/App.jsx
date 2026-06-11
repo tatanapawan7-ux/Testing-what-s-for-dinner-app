@@ -5,6 +5,7 @@ import { distanceMeters, GEO_RADIUS_M, searchNearbyRestaurants } from './lib/geo
 import { weightedPick, buildPool, readWheelAngle, SPIN_MS } from './lib/spin'
 import { buildBackup, validateBackup, applyBackup } from './lib/backup'
 import { buildShareCard } from './lib/sharecard'
+import { filterByTags, usedTags } from './lib/tags'
 import { celebrate, vibrate, getAudioContext, playFanfare, playWhoosh, playTick } from './lib/feedback'
 import Wheel from './components/Wheel.jsx'
 import PlaceBar from './components/PlaceBar.jsx'
@@ -16,6 +17,8 @@ import PhotoPicker from './components/PhotoPicker.jsx'
 import NearbyModal from './components/NearbyModal.jsx'
 import RenameModal from './components/RenameModal.jsx'
 import GroupModal from './components/GroupModal.jsx'
+import TagModal from './components/TagModal.jsx'
+import TagFilter from './components/TagFilter.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 
 /* -------------------------------------------------------------------------- */
@@ -43,6 +46,8 @@ export default function App() {
   const [importConfirm, setImportConfirm] = useState(null) // parsed backup awaiting confirm
   const [backupMsg, setBackupMsg] = useState('') // inline feedback by the footer buttons
   const [renameTarget, setRenameTarget] = useState(null) // food being renamed
+  const [tagTarget, setTagTarget] = useState(null) // food whose tags are being edited
+  const [activeTags, setActiveTags] = useState([]) // wheel filter (transient, per place)
   // Group spin: { stage:'size' } → { stage:'veto', total, current, vetoed: [foodIds] }
   const [groupModal, setGroupModal] = useState(null)
   const groupVetoesRef = useRef([]) // vetoes applied to the very next spin only
@@ -61,6 +66,7 @@ export default function App() {
   const [isSpinning, setIsSpinning] = useState(false)
   const [winner, setWinner] = useState(null) // food object once spin resolves
   const winnerIndexRef = useRef(null)
+  const spinListRef = useRef([]) // the exact list a spin is resolving over
   const wheelRef = useRef(null) // the rotating disc, read for spin tick sounds
   const tickRafRef = useRef(null)
 
@@ -127,12 +133,13 @@ export default function App() {
       else if (confirmClearHistory) setConfirmClearHistory(false)
       else if (importConfirm) setImportConfirm(null)
       else if (renameTarget) setRenameTarget(null)
+      else if (tagTarget) setTagTarget(null)
       else if (groupModal) setGroupModal(null)
       else if (winner) setWinner(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, renameTarget, groupModal, winner])
+  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, renameTarget, tagTarget, groupModal, winner])
 
   /* ------------------------------- Derived -------------------------------- */
   const activePlace = useMemo(
@@ -140,7 +147,10 @@ export default function App() {
     [places, activePlaceId],
   )
   const foods = useMemo(() => activePlace?.foods ?? [], [activePlace])
-  const segAngle = useMemo(() => 360 / Math.max(foods.length, 1), [foods.length])
+  // The wheel spins among dishes matching the active tag filter (all when none).
+  const wheelFoods = useMemo(() => filterByTags(foods, activeTags), [foods, activeTags])
+  const menuTags = useMemo(() => usedTags(foods), [foods])
+  const segAngle = useMemo(() => 360 / Math.max(wheelFoods.length, 1), [wheelFoods.length])
 
   // Heal seeded / legacy foods (no image, or a dead Unsplash URL) by fetching a
   // photo from Openverse the first time their place is viewed — one gentle pass
@@ -278,10 +288,19 @@ export default function App() {
     setRenameTarget(null)
   }
 
+  // Save the chosen tags onto a dish.
+  function handleTags(tags) {
+    updateActivePlaceFoods((list) =>
+      list.map((f) => (f.id === tagTarget.id ? { ...f, tags } : f)),
+    )
+    setTagTarget(null)
+  }
+
   /* ----------------------------- Place actions --------------------------- */
   function switchPlace(id) {
     if (isSpinning) return
     setActivePlaceId(id)
+    setActiveTags([]) // a filter from one menu shouldn't carry to another
     setError('')
   }
 
@@ -482,14 +501,19 @@ export default function App() {
 
   /* -------------------------------- Spin --------------------------------- */
   function handleSpin() {
-    if (isSpinning || foods.length < 2) return
+    if (isSpinning || wheelFoods.length < 2) return
     setError('')
 
     // Resume the audio context on this user gesture so the win chime can play.
     if (!muted) getAudioContext()?.resume?.()
 
+    // Spin over the currently filtered dishes; capture them so the result is
+    // stable even if the filter or menu changes during the spin.
+    const list = wheelFoods
+    spinListRef.current = list
+
     // Build the eligible pool (knock-outs, group vetoes, last winner), then pick.
-    const pool = buildPool(foods, {
+    const pool = buildPool(list, {
       knockout,
       roundWon,
       excludeIds: groupVetoesRef.current,
@@ -497,7 +521,7 @@ export default function App() {
     })
     if (pool.length === 0) return // round complete (spin is disabled, but guard anyway)
     const winnerIndex = variety
-      ? weightedPick(pool, foods, history.map((h) => h.name.toLowerCase()))
+      ? weightedPick(pool, list, history.map((h) => h.name.toLowerCase()))
       : pool[Math.floor(Math.random() * pool.length)]
     winnerIndexRef.current = winnerIndex
 
@@ -527,8 +551,9 @@ export default function App() {
     setIsSpinning(false)
     groupVetoesRef.current = [] // group vetoes apply to one spin only
     const idx = winnerIndexRef.current
-    if (idx == null || !foods[idx]) return
-    const win = foods[idx]
+    const list = spinListRef.current
+    if (idx == null || !list[idx]) return
+    const win = list[idx]
     lastWinnerId.current = win.id
     if (knockout) setRoundWon((prev) => (prev.includes(win.id) ? prev : [...prev, win.id]))
     setWinner(win)
@@ -559,7 +584,7 @@ export default function App() {
   // Pass-the-phone mode: each person may veto one dish, then the wheel spins
   // among what's left. Vetoes apply to that one spin only.
   function startGroupSpin() {
-    if (isSpinning || foods.length < 3) return
+    if (isSpinning || wheelFoods.length < 3) return
     setGroupModal({ stage: 'size' })
   }
 
@@ -644,7 +669,7 @@ export default function App() {
   }
   // Knock-out: clear the active place's foods from the won-this-round set.
   function resetRound() {
-    const ids = new Set(foods.map((f) => f.id))
+    const ids = new Set(wheelFoods.map((f) => f.id))
     setRoundWon((prev) => prev.filter((id) => !ids.has(id)))
   }
 
@@ -726,9 +751,10 @@ export default function App() {
     return { total: history.length, top, eaten: history.filter((h) => h.eaten === true).length }
   }, [history])
 
-  const roundComplete = knockout && foods.length > 0 && foods.every((f) => roundWon.includes(f.id))
-  const remaining = knockout ? foods.filter((f) => !roundWon.includes(f.id)).length : 0
-  const canSpin = foods.length >= 2 && !isSpinning && !roundComplete
+  const roundComplete =
+    knockout && wheelFoods.length > 0 && wheelFoods.every((f) => roundWon.includes(f.id))
+  const remaining = knockout ? wheelFoods.filter((f) => !roundWon.includes(f.id)).length : 0
+  const canSpin = wheelFoods.length >= 2 && !isSpinning && !roundComplete
   const editingPlace = placeModal?.id ? places.find((p) => p.id === placeModal.id) : null
 
   /* -------------------------------------------------------------------------- */
@@ -789,8 +815,22 @@ export default function App() {
           onNearby={handleNearby}
         />
 
+        {menuTags.length > 0 && (
+          <TagFilter
+            tags={menuTags}
+            active={activeTags}
+            count={wheelFoods.length}
+            total={foods.length}
+            disabled={isSpinning}
+            onToggle={(key) =>
+              setActiveTags((a) => (a.includes(key) ? a.filter((k) => k !== key) : [...a, key]))
+            }
+            onClear={() => setActiveTags([])}
+          />
+        )}
+
         <Wheel
-          foods={foods}
+          foods={wheelFoods}
           segAngle={segAngle}
           rotation={rotation}
           isSpinning={isSpinning}
@@ -800,13 +840,18 @@ export default function App() {
           knockout={knockout}
           variety={variety}
           error={error}
+          emptyLabel={
+            activeTags.length
+              ? 'No dishes match these filters'
+              : 'Add some food below to fill the wheel'
+          }
           wheelRef={wheelRef}
           onSpin={handleSpin}
           onSpinEnd={handleSpinEnd}
           onToggleVariety={() => setVariety((v) => !v)}
           onToggleKnockout={() => setKnockout((k) => !k)}
           onResetRound={resetRound}
-          canGroup={foods.length >= 3 && !isSpinning}
+          canGroup={wheelFoods.length >= 3 && !isSpinning}
           onGroupSpin={startGroupSpin}
         />
 
@@ -820,6 +865,7 @@ export default function App() {
           onSubmit={handleAddFood}
           onChangePhoto={openPhotoPicker}
           onRename={setRenameTarget}
+          onEditTags={setTagTarget}
           onDelete={requestDelete}
         />
 
@@ -957,7 +1003,7 @@ export default function App() {
       {groupModal && (
         <GroupModal
           modal={groupModal}
-          foods={foods}
+          foods={wheelFoods}
           onChooseSize={chooseGroupSize}
           onVeto={groupVeto}
           onSkip={groupSkip}
@@ -975,6 +1021,11 @@ export default function App() {
           onSave={handleRename}
           onClose={() => setRenameTarget(null)}
         />
+      )}
+
+      {/* Tag a dish */}
+      {tagTarget && (
+        <TagModal target={tagTarget} onSave={handleTags} onClose={() => setTagTarget(null)} />
       )}
     </div>
   )

@@ -89,11 +89,14 @@ src/
     NearbyModal.jsx      # OSM restaurant picker (radius + type filters)
     RenameModal.jsx      # rename a dish (duplicate-blocked)
     GroupModal.jsx       # pass-the-phone group vetoes, then spin
+    TagModal.jsx         # toggle a dish's tags
+    TagFilter.jsx        # tag chips above the wheel (filter the spin set)
   lib/                # pure logic, each with a colocated *.test.js
     photos.js            # placeholderImage, needsImage, searchFoodImages (TheMealDB+Openverse)
     storage.js           # uid, makeFood, makePlace, loadState, bootstrapPlaces
     geo.js               # distanceMeters, formatDistance, searchNearbyRestaurants (Overpass)
     spin.js              # buildPool, weightedPick, readWheelAngle, SPIN_MS
+    tags.js              # TAGS catalogue, filterByTags, usedTags
     feedback.js          # celebrate (confetti), vibrate, Web Audio sounds (untested: browser-only)
     backup.js            # buildBackup, validateBackup, applyBackup (export/import)
     sharecard.js         # canvas-rendered 1080² share PNG (untested: browser-only)
@@ -122,9 +125,9 @@ by an inline script in `index.html` to avoid a flash, with `meta theme-color` ke
 
 ## Architecture (`src/App.jsx`)
 
-- **Food** = `{ id, name, image }`. `makeFood(name, image?)` builds one with a `uid()`;
-  `image` is `null` until a photo is chosen/fetched. **No curated/Unsplash map** — all imagery
-  comes from a keyless multi-source search.
+- **Food** = `{ id, name, image, tags[] }`. `makeFood(name, image?)` builds one with a `uid()`
+  and empty `tags`; `image` is `null` until a photo is chosen/fetched. **No curated/Unsplash
+  map** — all imagery comes from a keyless multi-source search.
 - **Photo search** — `searchFoodImages(q, count)` merges **TheMealDB** (`searchMealDb`, nicer
   food photos, preferred) then **Openverse** (`searchOpenverse`, CC fallback), deduped; throws
   only if **both** sources fail. Results are `{ id, thumb, full, title }`.
@@ -188,6 +191,13 @@ by an inline script in `index.html` to avoid a flash, with `meta theme-color` ke
   (`buildBackup`); "Import data" parses + `validateBackup`s a chosen file, confirms via a
   modal (it overwrites), then `applyBackup` writes storage and reloads so all state
   rehydrates consistently.
+- **Tags & filters** — dishes carry curated `tags` (`lib/tags.js` `TAGS`: veg/vegan/quick/
+  healthy/cheap/spicy/treat), edited per-dish via the 🏷 card button (`TagModal`). A `TagFilter`
+  bar above the wheel (shown only when the menu uses tags, `usedTags`) drives `activeTags`; the
+  **wheel spins over `wheelFoods` = `filterByTags(foods, activeTags)`** (AND semantics) while the
+  menu still lists everything. `activeTags` is transient and resets on place switch; spin logic
+  (`handleSpin`/knock-out/group) all run on `wheelFoods`, and `spinListRef` captures the exact
+  list a spin resolves over.
 - **Group spin** — "👥 Group spin" under the wheel (needs ≥3 dishes): choose group size (2–6),
   then each person vetoes one dish or skips (`groupModal` stages 'size'→'veto'); vetoes go into
   `groupVetoesRef`, are consumed by the next spin via `buildPool`'s `excludeIds`, always leave
