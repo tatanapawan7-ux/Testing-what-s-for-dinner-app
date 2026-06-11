@@ -19,6 +19,7 @@ import RenameModal from './components/RenameModal.jsx'
 import GroupModal from './components/GroupModal.jsx'
 import TagModal from './components/TagModal.jsx'
 import TagFilter from './components/TagFilter.jsx'
+import EditDishMenu from './components/EditDishMenu.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 
 /* -------------------------------------------------------------------------- */
@@ -47,6 +48,7 @@ export default function App() {
   const [backupMsg, setBackupMsg] = useState('') // inline feedback by the footer buttons
   const [renameTarget, setRenameTarget] = useState(null) // food being renamed
   const [tagTarget, setTagTarget] = useState(null) // food whose tags are being edited
+  const [editDish, setEditDish] = useState(null) // food whose edit action sheet is open
   const [activeTags, setActiveTags] = useState([]) // wheel filter (transient, per place)
   // Group spin: { stage:'size' } → { stage:'veto', total, current, vetoed: [foodIds] }
   const [groupModal, setGroupModal] = useState(null)
@@ -134,12 +136,13 @@ export default function App() {
       else if (importConfirm) setImportConfirm(null)
       else if (renameTarget) setRenameTarget(null)
       else if (tagTarget) setTagTarget(null)
+      else if (editDish) setEditDish(null)
       else if (groupModal) setGroupModal(null)
       else if (winner) setWinner(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, renameTarget, tagTarget, groupModal, winner])
+  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, renameTarget, tagTarget, editDish, groupModal, winner])
 
   /* ------------------------------- Derived -------------------------------- */
   const activePlace = useMemo(
@@ -147,9 +150,18 @@ export default function App() {
     [places, activePlaceId],
   )
   const foods = useMemo(() => activePlace?.foods ?? [], [activePlace])
-  // The wheel spins among dishes matching the active tag filter (all when none).
-  const wheelFoods = useMemo(() => filterByTags(foods, activeTags), [foods, activeTags])
-  const menuTags = useMemo(() => usedTags(foods), [foods])
+  // The wheel spins among dishes matching the active filter ('fav' + tags; all
+  // when none).
+  const wheelFoods = useMemo(() => {
+    let wf = filterByTags(foods, activeTags.filter((t) => t !== 'fav'))
+    if (activeTags.includes('fav')) wf = wf.filter((f) => f.fav)
+    return wf
+  }, [foods, activeTags])
+  // Filter chips: a "Favorites" chip (when any dish is favourited) + used tags.
+  const filterChips = useMemo(() => {
+    const chips = usedTags(foods)
+    return foods.some((f) => f.fav) ? [{ key: 'fav', label: '♥ Favorites' }, ...chips] : chips
+  }, [foods])
   const segAngle = useMemo(() => 360 / Math.max(wheelFoods.length, 1), [wheelFoods.length])
 
   // Heal seeded / legacy foods (no image, or a dead Unsplash URL) by fetching a
@@ -294,6 +306,13 @@ export default function App() {
       list.map((f) => (f.id === tagTarget.id ? { ...f, tags } : f)),
     )
     setTagTarget(null)
+  }
+
+  // Toggle a dish as a favourite.
+  function toggleFavorite(food) {
+    updateActivePlaceFoods((list) =>
+      list.map((f) => (f.id === food.id ? { ...f, fav: !f.fav } : f)),
+    )
   }
 
   /* ----------------------------- Place actions --------------------------- */
@@ -815,9 +834,9 @@ export default function App() {
           onNearby={handleNearby}
         />
 
-        {menuTags.length > 0 && (
+        {filterChips.length > 0 && (
           <TagFilter
-            tags={menuTags}
+            tags={filterChips}
             active={activeTags}
             count={wheelFoods.length}
             total={foods.length}
@@ -863,9 +882,8 @@ export default function App() {
           roundWon={roundWon}
           onInputChange={setInput}
           onSubmit={handleAddFood}
-          onChangePhoto={openPhotoPicker}
-          onRename={setRenameTarget}
-          onEditTags={setTagTarget}
+          onEdit={setEditDish}
+          onFavorite={toggleFavorite}
           onDelete={requestDelete}
         />
 
@@ -1026,6 +1044,26 @@ export default function App() {
       {/* Tag a dish */}
       {tagTarget && (
         <TagModal target={tagTarget} onSave={handleTags} onClose={() => setTagTarget(null)} />
+      )}
+
+      {/* Edit a dish (action sheet → rename / tags / photo) */}
+      {editDish && (
+        <EditDishMenu
+          food={editDish}
+          onRename={() => {
+            setRenameTarget(editDish)
+            setEditDish(null)
+          }}
+          onTags={() => {
+            setTagTarget(editDish)
+            setEditDish(null)
+          }}
+          onPhoto={() => {
+            openPhotoPicker(editDish.name, editDish.id)
+            setEditDish(null)
+          }}
+          onClose={() => setEditDish(null)}
+        />
       )}
     </div>
   )

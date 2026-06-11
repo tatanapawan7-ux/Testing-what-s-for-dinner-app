@@ -81,7 +81,7 @@ src/
     FoodImage.jsx        # <img> with placeholder fallback + no-referrer
     Wheel.jsx            # disc, pointer, spin hub, variety/knock-out controls
     PlaceBar.jsx         # place chips + location actions + status toast
-    Menu.jsx             # add-a-dish form + food card grid (rename/photo/delete)
+    Menu.jsx             # add-a-dish form + food card grid (favorite/edit/delete)
     History.jsx          # stats strip + history timeline
     WinnerModal.jsx      # celebration dialog (share, maps link, spin again)
     PlaceModal.jsx       # add/edit place (name, emoji, pin clearing)
@@ -91,6 +91,7 @@ src/
     GroupModal.jsx       # pass-the-phone group vetoes, then spin
     TagModal.jsx         # toggle a dish's tags
     TagFilter.jsx        # tag chips above the wheel (filter the spin set)
+    EditDishMenu.jsx     # per-dish action sheet → rename / tags / change photo
   lib/                # pure logic, each with a colocated *.test.js
     photos.js            # placeholderImage, needsImage, searchFoodImages (TheMealDB+Openverse)
     storage.js           # uid, makeFood, makePlace, loadState, bootstrapPlaces
@@ -125,8 +126,8 @@ by an inline script in `index.html` to avoid a flash, with `meta theme-color` ke
 
 ## Architecture (`src/App.jsx`)
 
-- **Food** = `{ id, name, image, tags[] }`. `makeFood(name, image?)` builds one with a `uid()`
-  and empty `tags`; `image` is `null` until a photo is chosen/fetched. **No curated/Unsplash
+- **Food** = `{ id, name, image, tags[], fav? }`. `makeFood(name, image?)` builds one with a
+  `uid()` and empty `tags` (`fav` is set on demand); `image` is `null` until a photo is chosen/fetched. **No curated/Unsplash
   map** — all imagery comes from a keyless multi-source search.
 - **Photo search** — `searchFoodImages(q, count)` merges **TheMealDB** (`searchMealDb`, nicer
   food photos, preferred) then **Openverse** (`searchOpenverse`, CC fallback), deduped; throws
@@ -198,6 +199,12 @@ by an inline script in `index.html` to avoid a flash, with `meta theme-color` ke
   menu still lists everything. `activeTags` is transient and resets on place switch; spin logic
   (`handleSpin`/knock-out/group) all run on `wheelFoods`, and `spinListRef` captures the exact
   list a spin resolves over.
+- **Favorites** — a ♥ on each menu card toggles `food.fav` (`toggleFavorite`); when any dish is
+  favourited a special **♥ Favorites** chip joins the filter bar (`activeTags` key `'fav'`,
+  handled in the `wheelFoods` memo) so you can spin only favourites.
+- **Editing a dish** — each card has one **Edit** button opening `EditDishMenu`, a labelled
+  action sheet that routes to rename / tags / change-photo (keeps the cards uncluttered);
+  ♥ favourite and ✕ delete stay on the card for quick access.
 - **Group spin** — "👥 Group spin" under the wheel (needs ≥3 dishes): choose group size (2–6),
   then each person vetoes one dish or skips (`groupModal` stages 'size'→'veto'); vetoes go into
   `groupVetoesRef`, are consumed by the next spin via `buildPool`'s `excludeIds`, always leave

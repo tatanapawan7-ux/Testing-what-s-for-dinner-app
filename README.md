@@ -14,11 +14,11 @@ a celebratory winner modal and a persistent history of past spins.
   GPS "use my location" auto-switch to the nearest place you've pinned
 - 🍴 **Restaurants near me** — pull real nearby restaurants from OpenStreetMap (keyless, free)
   and spin the wheel among them to decide where to eat out
-- ➕ **Menu management** — add, rename, tag, or remove dishes per place; adding a dish shows a
-  **photo picker** of matching images (TheMealDB + Openverse) so the picture fits the food —
-  or paste your own image link, and change any dish's photo later
-- 🏷️ **Tags & filters** — tag dishes (veg, quick, treat…) and narrow the wheel before you
-  spin: "only vegetarian", "only quick meals"
+- ➕ **Menu management** — add dishes per place; each card has a ❤️ favorite, a one-tap **Edit**
+  menu (rename · tags · change photo), and delete. Adding a dish shows a **photo picker** of
+  matching images (TheMealDB + Openverse), or paste your own image link
+- 🏷️ **Tags, favorites & filters** — tag dishes (veg, quick, treat…) and favourite the ones
+  you love, then narrow the wheel before you spin: "only vegetarian", "only favourites"
 - 🎉 **Winner modal** with a confetti burst + celebratory chime (sound has a mute toggle),
   and a **Share this pick** button — a generated photo card via the native share sheet,
   with text-share and clipboard fallbacks

@@ -9,11 +9,12 @@ export default function Menu({
   roundWon,
   onInputChange,
   onSubmit,
-  onChangePhoto,
-  onRename,
-  onEditTags,
+  onEdit,
+  onFavorite,
   onDelete,
 }) {
+  const cornerBtn =
+    'absolute top-2 flex h-8 w-8 items-center justify-center rounded-full text-white backdrop-blur transition-all duration-300'
   return (
     <section className="animate-float-up rounded-3xl border border-line bg-surface p-5 shadow-card [animation-delay:180ms] sm:p-6">
       <h2 className="mb-4 font-display text-lg font-semibold text-ink">
@@ -37,7 +38,7 @@ export default function Menu({
         </button>
       </form>
 
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mt-5 grid grid-cols-2 gap-3.5">
         {foods.map((food) => {
           const picked = knockout && roundWon.includes(food.id)
           return (
@@ -50,14 +51,40 @@ export default function Menu({
               <FoodImage
                 name={food.name}
                 src={food.image}
-                className="h-24 w-full object-cover transition-transform duration-300 group-hover:scale-105 sm:h-28"
+                className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-105 sm:h-44"
               />
+
+              {/* Favorite (top-left) */}
+              <button
+                onClick={() => onFavorite(food)}
+                aria-label={food.fav ? `Unfavorite ${food.name}` : `Favorite ${food.name}`}
+                aria-pressed={Boolean(food.fav)}
+                title={food.fav ? 'Favorite' : 'Add to favorites'}
+                className={`${cornerBtn} left-2 text-base hover:scale-110 ${
+                  food.fav ? 'bg-red-500/85 hover:bg-red-500' : 'bg-[#2c2520]/55 hover:bg-[#2c2520]/75'
+                }`}
+              >
+                {food.fav ? '♥' : '♡'}
+              </button>
+
               {picked && (
-                <span className="absolute left-2 top-2 rounded-full bg-surface/90 px-2 py-0.5 text-[11px] font-semibold text-terra shadow-sm">
+                <span className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-surface/90 px-2 py-0.5 text-[11px] font-semibold text-terra shadow-sm">
                   ✓ picked
                 </span>
               )}
-              <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/80 to-transparent px-3 pb-2 pt-5">
+
+              {/* Delete (top-right) */}
+              <button
+                onClick={() => onDelete(food)}
+                aria-label={`Remove ${food.name}`}
+                title="Remove"
+                className={`${cornerBtn} right-2 bg-[#2c2520]/55 hover:bg-terra`}
+              >
+                ✕
+              </button>
+
+              {/* Name + tags + Edit */}
+              <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1.5 bg-gradient-to-t from-black/80 to-transparent px-3 pb-2.5 pt-6">
                 {(food.tags?.length ?? 0) > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {food.tags.map((t) => (
@@ -74,41 +101,15 @@ export default function Menu({
                   <span className="truncate text-sm font-semibold text-white drop-shadow">
                     {food.name}
                   </span>
-                  <span className="flex shrink-0 items-center gap-1.5">
-                    <button
-                      onClick={() => onRename(food)}
-                      aria-label={`Rename ${food.name}`}
-                      title="Rename"
-                      className="text-sm leading-none text-white opacity-90 transition-opacity duration-300 hover:opacity-100"
-                    >
-                      ✎
-                    </button>
-                    <button
-                      onClick={() => onEditTags(food)}
-                      aria-label={`Tag ${food.name}`}
-                      title="Tags"
-                      className="text-sm leading-none opacity-90 transition-opacity duration-300 hover:opacity-100"
-                    >
-                      🏷
-                    </button>
-                    <button
-                      onClick={() => onChangePhoto(food.name, food.id)}
-                      aria-label={`Change photo for ${food.name}`}
-                      title="Change photo"
-                      className="text-base leading-none opacity-90 transition-opacity duration-300 hover:opacity-100"
-                    >
-                      🖼
-                    </button>
-                  </span>
+                  <button
+                    onClick={() => onEdit(food)}
+                    aria-label={`Edit ${food.name}`}
+                    className="shrink-0 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm transition-all duration-300 hover:bg-white/30 active:scale-95"
+                  >
+                    Edit
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={() => onDelete(food)}
-                aria-label={`Remove ${food.name}`}
-                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#2c2520]/55 text-white backdrop-blur transition-all duration-300 hover:bg-terra"
-              >
-                ✕
-              </button>
             </div>
           )
         })}
