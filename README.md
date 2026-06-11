@@ -18,7 +18,12 @@ a celebratory winner modal and a persistent history of past spins.
   menu (rename · tags · change photo), and delete. Adding a dish shows a **photo picker** of
   matching images (TheMealDB + Openverse), or paste your own image link
 - 🏷️ **Tags, favorites & filters** — tag dishes (veg, quick, treat…) and favourite the ones
-  you love, then narrow the wheel before you spin: "only vegetarian", "only favourites"
+  you love, then narrow the wheel before you spin: "only vegetarian", "only favourites" —
+  or turn on **♥ Boost favorites** to give hearted dishes bigger slices and double odds
+- ⭐ **Rate & refine** — star a dinner after you eat it; dishes show their average rating and
+  the wheel quietly favours what you loved (and avoids what you didn't)
+- 🔗 **Shareable menus** — send a whole menu to a friend as a link; one tap adds it to their
+  wheel (no account needed — the dishes travel inside the URL)
 - 🎉 **Winner modal** with a confetti burst + celebratory chime (sound has a mute toggle),
   and a **Share this pick** button — a generated photo card via the native share sheet,
   with text-share and clipboard fallbacks
@@ -41,12 +46,13 @@ a celebratory winner modal and a persistent history of past spins.
 1. **Pick a place** — tap a profile chip (Home, Mall, Work…) to load that menu, or hit
    **📍 Use my location** to auto-switch to the nearest place you've pinned.
 2. **Build your menu** — type a dish, press **Add Food**, and choose a photo (or paste a link).
-   Tap the 🖼 on any card to change its photo, or ✕ to remove it.
+   On any card: tap ❤️ to favorite, **Edit** to rename / tag / change the photo, or ✕ to remove.
 3. **Spin the wheel** — press **SPIN** and let it land on tonight's dinner. Toggle
-   **✨ Favor variety** or **🎯 Knock-out** under the wheel for smarter picking, and
-   **🔊/🔇** to control sound.
+   **Favor variety**, **Knock-out**, or **♥ Boost favorites** under the wheel for smarter
+   picking, and 🔊/🔇 to control sound.
 4. **Track it** — each result is logged to **Dinner History**; mark whether you actually
-   **✅ Ate it** or **❌ Didn't**. Everything is saved in your browser, so it persists on refresh.
+   **✅ Ate it** or **❌ Didn't**, and give it a ★ rating — the wheel learns what you love.
+   Everything is saved in your browser, so it persists on refresh.
 
 ## Tech Stack
 

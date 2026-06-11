@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { SPIN_MS } from '../lib/spin'
+import { SPIN_MS, sliceLayout } from '../lib/spin'
 
 // Curated warm earth/jewel palette — harmonious, premium, cycles per segment.
 const WHEEL_COLORS = [
@@ -12,7 +12,8 @@ const WHEEL_COLORS = [
 // live in App; this renders the given rotation and reports interactions up.
 export default function Wheel({
   foods,
-  segAngle,
+  favBoost,
+  showFavBoost,
   rotation,
   isSpinning,
   canSpin,
@@ -27,21 +28,24 @@ export default function Wheel({
   onSpinEnd,
   onToggleVariety,
   onToggleKnockout,
+  onToggleFavBoost,
   onResetRound,
   canGroup,
   onGroupSpin,
 }) {
-  // conic-gradient background for the wheel slices.
+  // Slice geometry (favorites get wider slices when the boost is on) and the
+  // conic-gradient background built from it.
+  const layout = useMemo(() => sliceLayout(foods, favBoost), [foods, favBoost])
   const wheelBackground = useMemo(() => {
     if (foods.length === 0) return 'radial-gradient(circle at 50% 38%, #dca97e, #a6603c)'
-    const stops = foods
-      .map((_, i) => {
+    const stops = layout
+      .map((s, i) => {
         const color = WHEEL_COLORS[i % WHEEL_COLORS.length]
-        return `${color} ${i * segAngle}deg ${(i + 1) * segAngle}deg`
+        return `${color} ${s.start}deg ${s.start + s.size}deg`
       })
       .join(', ')
     return `conic-gradient(${stops})`
-  }, [foods, segAngle])
+  }, [foods.length, layout])
 
   // Crowded wheels (9+ slices) get smaller, tighter labels so they stay legible.
   const crowded = foods.length > 8
@@ -91,7 +95,7 @@ export default function Wheel({
           >
             {/* Slice labels */}
             {foods.map((food, i) => {
-              const rotate = i * segAngle + segAngle / 2
+              const rotate = layout[i].center
               return (
                 <div
                   key={food.id}
@@ -162,6 +166,20 @@ export default function Wheel({
         >
           Knock-out
         </button>
+        {showFavBoost && (
+          <button
+            onClick={onToggleFavBoost}
+            aria-pressed={favBoost}
+            title="Give hearted dishes double odds (bigger slices)"
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
+              favBoost
+                ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)]'
+                : 'border border-line bg-surface text-ink/70 shadow-sm hover:border-terra/40'
+            }`}
+          >
+            ♥ Boost favorites
+          </button>
+        )}
         <button
           onClick={onGroupSpin}
           disabled={!canGroup}

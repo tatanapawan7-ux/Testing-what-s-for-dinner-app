@@ -28,15 +28,23 @@ export function buildPool(foods, { knockout = false, roundWon = [], excludeIds =
   return pool
 }
 
-// Recency-weighted pick over candidate food indices: dishes appearing recently
-// in `historyNames` (lowercased, newest first) get lower weight, so the wheel
-// favours variety. Never-recent dishes get the highest weight.
-export function weightedPick(pool, foods, historyNames) {
-  const recent = historyNames.slice(0, 30)
-  const weights = pool.map((i) => {
-    const idx = recent.indexOf(foods[i].name.toLowerCase())
-    return idx === -1 ? recent.length + 1 : idx + 1
+// Slice geometry for the wheel. Normally equal slices; with the favorites
+// boost on, hearted dishes get double-width slices (and matching odds).
+// Returns [{ start, size, center }] in degrees, summing to 360.
+export function sliceLayout(foods, boostFavs = false) {
+  const weights = foods.map((f) => (boostFavs && f.fav ? 2 : 1))
+  const total = weights.reduce((a, b) => a + b, 0) || 1
+  let acc = 0
+  return weights.map((w) => {
+    const size = (w / total) * 360
+    const slice = { start: acc, size, center: acc + size / 2 }
+    acc += size
+    return slice
   })
+}
+
+// Weighted random over pool entries; `weights` is aligned to `pool`.
+export function pickIndexWeighted(pool, weights) {
   const total = weights.reduce((a, b) => a + b, 0)
   let r = Math.random() * total
   for (let k = 0; k < pool.length; k++) {
@@ -44,4 +52,23 @@ export function weightedPick(pool, foods, historyNames) {
     if (r <= 0) return pool[k]
   }
   return pool[pool.length - 1]
+}
+
+// Recency-weighted pick over candidate food indices: dishes appearing recently
+// in `historyNames` (lowercased, newest first) get lower weight, so the wheel
+// favours variety. Never-recent dishes get the highest weight. Optionally,
+// hearted dishes get double weight (boostFavs) and the user's average star
+// ratings nudge odds (ratings: Map of lowercased name → 1..5; 3★ is neutral).
+export function weightedPick(pool, foods, historyNames, { boostFavs = false, ratings = null } = {}) {
+  const recent = historyNames.slice(0, 30)
+  const weights = pool.map((i) => {
+    const f = foods[i]
+    const idx = recent.indexOf(f.name.toLowerCase())
+    let w = idx === -1 ? recent.length + 1 : idx + 1
+    if (boostFavs && f.fav) w *= 2
+    const avg = ratings?.get(f.name.toLowerCase())
+    if (avg) w *= avg / 3
+    return w
+  })
+  return pickIndexWeighted(pool, weights)
 }

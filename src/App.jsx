@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { needsImage, searchFoodImages } from './lib/photos'
 import { uid, makeFood, makePlace, loadState, bootstrapPlaces } from './lib/storage'
 import { distanceMeters, GEO_RADIUS_M, searchNearbyRestaurants } from './lib/geo'
-import { weightedPick, buildPool, readWheelAngle, SPIN_MS } from './lib/spin'
+import { weightedPick, buildPool, pickIndexWeighted, sliceLayout, readWheelAngle, SPIN_MS } from './lib/spin'
+import { averageRatings, topRated } from './lib/ratings'
+import { encodeMenu, decodeMenu } from './lib/sharemenu'
 import { buildBackup, validateBackup, applyBackup } from './lib/backup'
 import { buildShareCard } from './lib/sharecard'
 import { filterByTags, usedTags } from './lib/tags'
@@ -61,6 +63,12 @@ export default function App() {
   // Smarter spinning
   const [variety, setVariety] = useState(() => loadState('wfd-variety', true))
   const [knockout, setKnockout] = useState(() => loadState('wfd-knockout', false))
+  const [favBoost, setFavBoost] = useState(() => loadState('wfd-favboost', false))
+  // A shared menu arriving via a #menu= link, decoded once on load.
+  const [importMenu, setImportMenu] = useState(() => {
+    const m = window.location.hash.match(/^#menu=(.+)$/)
+    return m ? decodeMenu(m[1]) : null
+  })
   const [roundWon, setRoundWon] = useState(() => loadState('wfd-round', [])) // food ids won this round
   const lastWinnerId = useRef(null)
 
@@ -104,6 +112,9 @@ export default function App() {
     localStorage.setItem('wfd-knockout', JSON.stringify(knockout))
   }, [knockout])
   useEffect(() => {
+    localStorage.setItem('wfd-favboost', JSON.stringify(favBoost))
+  }, [favBoost])
+  useEffect(() => {
     localStorage.setItem('wfd-round', JSON.stringify(roundWon))
   }, [roundWon])
 
@@ -134,6 +145,7 @@ export default function App() {
       else if (confirmDelete) setConfirmDelete(null)
       else if (confirmClearHistory) setConfirmClearHistory(false)
       else if (importConfirm) setImportConfirm(null)
+      else if (importMenu) setImportMenu(null)
       else if (renameTarget) setRenameTarget(null)
       else if (tagTarget) setTagTarget(null)
       else if (editDish) setEditDish(null)
@@ -142,7 +154,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, renameTarget, tagTarget, editDish, groupModal, winner])
+  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, importMenu, renameTarget, tagTarget, editDish, groupModal, winner])
 
   /* ------------------------------- Derived -------------------------------- */
   const activePlace = useMemo(
@@ -162,7 +174,9 @@ export default function App() {
     const chips = usedTags(foods)
     return foods.some((f) => f.fav) ? [{ key: 'fav', label: '♥ Favorites' }, ...chips] : chips
   }, [foods])
-  const segAngle = useMemo(() => 360 / Math.max(wheelFoods.length, 1), [wheelFoods.length])
+  // Slice geometry (favorites get wider slices when boosted) and star averages.
+  const layout = useMemo(() => sliceLayout(wheelFoods, favBoost), [wheelFoods, favBoost])
+  const ratings = useMemo(() => averageRatings(history), [history])
 
   // Heal seeded / legacy foods (no image, or a dead Unsplash URL) by fetching a
   // photo from Openverse the first time their place is viewed — one gentle pass
@@ -486,7 +500,7 @@ export default function App() {
     if (muted) return
     const el = wheelRef.current
     if (!el) return
-    const seg = 360 / Math.max(foods.length, 1)
+    const seg = 360 / Math.max(wheelFoods.length, 1)
     let prev = readWheelAngle(el)
     let traveled = 0
     let nextTick = seg
@@ -539,13 +553,18 @@ export default function App() {
       lastWinnerId: lastWinnerId.current,
     })
     if (pool.length === 0) return // round complete (spin is disabled, but guard anyway)
+    // Variety mode: recency + ratings + boost; otherwise uniform (or 2:1 for
+    // boosted favorites, matching their visually wider slices).
     const winnerIndex = variety
-      ? weightedPick(pool, list, history.map((h) => h.name.toLowerCase()))
-      : pool[Math.floor(Math.random() * pool.length)]
+      ? weightedPick(pool, list, history.map((h) => h.name.toLowerCase()), {
+          boostFavs: favBoost,
+          ratings,
+        })
+      : pickIndexWeighted(pool, pool.map((i) => (favBoost && list[i].fav ? 2 : 1)))
     winnerIndexRef.current = winnerIndex
 
     // Land the winning segment's centre under the top pointer (0deg).
-    const center = winnerIndex * segAngle + segAngle / 2
+    const center = layout[winnerIndex].center
     const targetMod = (360 - center) % 360
     const currentMod = ((rotation % 360) + 360) % 360
     let delta = targetMod - currentMod
@@ -700,8 +719,21 @@ export default function App() {
       prev.map((e) => {
         if (e.id !== id) return e
         const next = e.eaten === value ? null : value
-        return { ...e, eaten: next, eatenAt: next === true ? Date.now() : null }
+        return {
+          ...e,
+          eaten: next,
+          eatenAt: next === true ? Date.now() : null,
+          // A rating only makes sense for a dinner that was actually eaten.
+          rating: next === true ? e.rating : null,
+        }
       }),
+    )
+  }
+
+  // Star a dinner you ate (1–5); tapping the same star clears it.
+  function rateEntry(id, value) {
+    setHistory((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, rating: e.rating === value ? null : value } : e)),
     )
   }
 
@@ -767,8 +799,51 @@ export default function App() {
         top = name
       }
     }
-    return { total: history.length, top, eaten: history.filter((h) => h.eaten === true).length }
+    return {
+      total: history.length,
+      top,
+      eaten: history.filter((h) => h.eaten === true).length,
+      topRated: topRated(history),
+    }
   }, [history])
+
+  /* ----------------------------- Shared menus ----------------------------- */
+  // Share the active menu as a link (the dishes travel inside the URL hash).
+  async function shareMenu() {
+    const url = `${window.location.origin}${window.location.pathname}#menu=${encodeMenu(activePlace)}`
+    const text = `My "${activePlace.name}" dinner menu — open to add it to your wheel:`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "What's for Dinner?", text, url })
+        return
+      } catch (e) {
+        if (e?.name === 'AbortError') return
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setStatus('🔗 Menu link copied — send it to a friend')
+    } catch {
+      setStatus('⚠️ Couldn’t copy the link.')
+    }
+  }
+
+  // Clean a #menu= hash off the URL after load so reloads don't re-prompt.
+  useEffect(() => {
+    if (window.location.hash.startsWith('#menu=')) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }, [])
+
+  // Accept a shared menu: add it as a new place and switch to it.
+  function confirmImportMenu() {
+    const place = makePlace(importMenu.name, importMenu.emoji)
+    place.foods = importMenu.foods.map((f) => ({ ...makeFood(f.name), tags: f.tags }))
+    setPlaces((prev) => [...prev, place])
+    setActivePlaceId(place.id)
+    setImportMenu(null)
+    setStatus(`✨ Added "${importMenu.name}" with ${importMenu.foods.length} dishes`)
+  }
 
   const roundComplete =
     knockout && wheelFoods.length > 0 && wheelFoods.every((f) => roundWon.includes(f.id))
@@ -850,7 +925,8 @@ export default function App() {
 
         <Wheel
           foods={wheelFoods}
-          segAngle={segAngle}
+          favBoost={favBoost}
+          showFavBoost={foods.some((f) => f.fav)}
           rotation={rotation}
           isSpinning={isSpinning}
           canSpin={canSpin}
@@ -869,6 +945,7 @@ export default function App() {
           onSpinEnd={handleSpinEnd}
           onToggleVariety={() => setVariety((v) => !v)}
           onToggleKnockout={() => setKnockout((k) => !k)}
+          onToggleFavBoost={() => setFavBoost((b) => !b)}
           onResetRound={resetRound}
           canGroup={wheelFoods.length >= 3 && !isSpinning}
           onGroupSpin={startGroupSpin}
@@ -885,6 +962,8 @@ export default function App() {
           onEdit={setEditDish}
           onFavorite={toggleFavorite}
           onDelete={requestDelete}
+          onShareMenu={shareMenu}
+          ratings={ratings}
         />
 
         <History
@@ -892,6 +971,7 @@ export default function App() {
           stats={stats}
           onClearAll={() => setConfirmClearHistory(true)}
           onMarkEaten={markEaten}
+          onRate={rateEntry}
           onRemove={removeHistoryEntry}
         />
 
@@ -1044,6 +1124,23 @@ export default function App() {
       {/* Tag a dish */}
       {tagTarget && (
         <TagModal target={tagTarget} onSave={handleTags} onClose={() => setTagTarget(null)} />
+      )}
+
+      {/* Import a shared menu (from a #menu= link) */}
+      {importMenu && (
+        <ConfirmModal
+          labelId="import-menu-title"
+          title={`Add "${importMenu.name}" menu?`}
+          confirmLabel="Add menu"
+          message={`Someone shared ${importMenu.foods.length} ${
+            importMenu.foods.length === 1 ? 'dish' : 'dishes'
+          } with you: ${importMenu.foods
+            .slice(0, 8)
+            .map((f) => f.name)
+            .join(', ')}${importMenu.foods.length > 8 ? '…' : ''}. It'll be added as a new place.`}
+          onConfirm={confirmImportMenu}
+          onCancel={() => setImportMenu(null)}
+        />
       )}
 
       {/* Edit a dish (action sheet → rename / tags / photo) */}

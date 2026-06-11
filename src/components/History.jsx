@@ -11,7 +11,7 @@ function formatDate(ts) {
 }
 
 // Dinner history: the stats strip, the timeline, and per-entry controls.
-export default function History({ history, stats, onClearAll, onMarkEaten, onRemove }) {
+export default function History({ history, stats, onClearAll, onMarkEaten, onRate, onRemove }) {
   return (
     <section className="animate-float-up [animation-delay:240ms]">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -27,7 +27,7 @@ export default function History({ history, stats, onClearAll, onMarkEaten, onRem
       </div>
 
       {stats.total > 0 && (
-        <div className="mb-4 grid grid-cols-3 gap-2.5">
+        <div className={`mb-4 grid gap-2.5 ${stats.topRated ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
           <div className="rounded-2xl border border-line bg-surface p-3 text-center shadow-soft">
             <div className="flex h-8 items-center justify-center font-display font-bold text-terra">
               <span key={stats.total} className="animate-ping-once text-2xl">
@@ -57,6 +57,19 @@ export default function History({ history, stats, onClearAll, onMarkEaten, onRem
               Top pick
             </div>
           </div>
+          {stats.topRated && (
+            <div className="rounded-2xl border border-line bg-surface p-3 text-center shadow-soft">
+              <div
+                className="flex h-8 items-center justify-center truncate px-1 font-display text-base font-bold capitalize text-gold"
+                title={`${stats.topRated.name} — ★ ${stats.topRated.avg.toFixed(1)}`}
+              >
+                ★ {stats.topRated.name}
+              </div>
+              <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                Top rated
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -87,9 +100,30 @@ export default function History({ history, stats, onClearAll, onMarkEaten, onRem
                 </div>
                 <p className="text-xs text-muted">Spun {formatDate(entry.time)}</p>
                 {entry.eaten === true && (
-                  <p className="text-xs font-medium text-sage">
-                    ✓ Ate this{entry.eatenAt ? ` · ${formatDate(entry.eatenAt)}` : ''}
-                  </p>
+                  <>
+                    <p className="text-xs font-medium text-sage">
+                      ✓ Ate this{entry.eatenAt ? ` · ${formatDate(entry.eatenAt)}` : ''}
+                    </p>
+                    {/* How was it? Stars feed the wheel's variety weighting. */}
+                    <div className="mt-0.5 flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button
+                          key={n}
+                          onClick={() => onRate(entry.id, n)}
+                          aria-label={`Rate ${entry.name} ${n} of 5`}
+                          aria-pressed={entry.rating === n}
+                          className={`text-base leading-none transition-transform duration-150 hover:scale-125 ${
+                            entry.rating >= n ? 'text-gold' : 'text-line'
+                          }`}
+                        >
+                          ★
+                        </button>
+                      ))}
+                      {!entry.rating && (
+                        <span className="ml-1 text-[11px] text-muted/70">How was it?</span>
+                      )}
+                    </div>
+                  </>
                 )}
                 {entry.eaten === false && (
                   <p className="text-xs font-medium text-muted">✗ Didn’t go</p>

@@ -12,15 +12,28 @@ export default function Menu({
   onEdit,
   onFavorite,
   onDelete,
+  onShareMenu,
+  ratings,
 }) {
   const cornerBtn =
     'absolute top-2 flex h-8 w-8 items-center justify-center rounded-full text-white backdrop-blur transition-all duration-300'
   return (
     <section className="animate-float-up rounded-3xl border border-line bg-surface p-5 shadow-card [animation-delay:180ms] sm:p-6">
-      <h2 className="mb-4 font-display text-lg font-semibold text-ink">
-        {place.emoji} {place.name}
-        <span className="text-muted"> — Menu</span>
-      </h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="font-display text-lg font-semibold text-ink">
+          {place.emoji} {place.name}
+          <span className="text-muted"> — Menu</span>
+        </h2>
+        {foods.length > 0 && (
+          <button
+            onClick={onShareMenu}
+            title="Share this menu as a link"
+            className="shrink-0 rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-muted shadow-sm transition-all duration-300 hover:border-terra/40 hover:text-ink"
+          >
+            Share menu
+          </button>
+        )}
+      </div>
 
       <form onSubmit={onSubmit} className="flex gap-2">
         <input
@@ -98,8 +111,15 @@ export default function Menu({
                   </div>
                 )}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold text-white drop-shadow">
-                    {food.name}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold text-white drop-shadow">
+                      {food.name}
+                    </span>
+                    {ratings?.get(food.name.toLowerCase()) && (
+                      <span className="shrink-0 rounded bg-gold/90 px-1.5 py-0.5 text-[10px] font-bold text-ink">
+                        ★ {ratings.get(food.name.toLowerCase()).toFixed(1)}
+                      </span>
+                    )}
                   </span>
                   <button
                     onClick={() => onEdit(food)}

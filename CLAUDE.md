@@ -96,8 +96,10 @@ src/
     photos.js            # placeholderImage, needsImage, searchFoodImages (TheMealDB+Openverse)
     storage.js           # uid, makeFood, makePlace, loadState, bootstrapPlaces
     geo.js               # distanceMeters, formatDistance, searchNearbyRestaurants (Overpass)
-    spin.js              # buildPool, weightedPick, readWheelAngle, SPIN_MS
+    spin.js              # buildPool, weightedPick, sliceLayout, pickIndexWeighted, readWheelAngle, SPIN_MS
     tags.js              # TAGS catalogue, filterByTags, usedTags
+    ratings.js           # averageRatings, topRated (star ratings live on history entries)
+    sharemenu.js         # encodeMenu/decodeMenu — menus shared as base64url in the URL hash
     feedback.js          # celebrate (confetti), vibrate, Web Audio sounds (untested: browser-only)
     backup.js            # buildBackup, validateBackup, applyBackup (export/import)
     sharecard.js         # canvas-rendered 1080² share PNG (untested: browser-only)
@@ -186,8 +188,13 @@ by an inline script in `index.html` to avoid a flash, with `meta theme-color` ke
 - **History** — each entry `{ id, name, image, time, place, eaten: null|true|false, eatenAt }`;
   an "✅ Ate it / ❌ Didn't" control via `markEaten()` (older entries render as pending). Each
   entry has a ✕ to remove just that spin (`removeHistoryEntry`); a confirm-gated **Clear all**
-  in the section header wipes the whole log (`clearHistory`). A compact 3-up **stats** strip
-  (`stats` memo: total decided, eaten, top pick) sits above the list when history is non-empty.
+  in the section header wipes the whole log (`clearHistory`). Entries marked **eaten** show a
+  5-star row (`rateEntry`; same star clears; clearing eaten clears the rating): ratings power a
+  per-dish ★-average badge on menu cards (`averageRatings`, matched by lowercased name), a
+  **Top rated** stats tile, and a rating factor (`avg/3`, 3★ neutral) inside `weightedPick`
+  when **Favor variety** is on — the wheel learns your taste. A compact **stats** strip
+  (`stats` memo: total decided, eaten, top pick, top rated) sits above the list when history
+  is non-empty.
 - **Backup** — "Export data" in the footer downloads all `wfd-*` keys as one JSON file
   (`buildBackup`); "Import data" parses + `validateBackup`s a chosen file, confirms via a
   modal (it overwrites), then `applyBackup` writes storage and reloads so all state
@@ -201,7 +208,10 @@ by an inline script in `index.html` to avoid a flash, with `meta theme-color` ke
   list a spin resolves over.
 - **Favorites** — a ♥ on each menu card toggles `food.fav` (`toggleFavorite`); when any dish is
   favourited a special **♥ Favorites** chip joins the filter bar (`activeTags` key `'fav'`,
-  handled in the `wheelFoods` memo) so you can spin only favourites.
+  handled in the `wheelFoods` memo) so you can spin only favourites. A persisted **♥ Boost
+  favorites** toggle (`wfd-favboost`, chip shown when any dish is hearted) gives hearted dishes
+  **double odds and visually wider slices**: `sliceLayout` drives the conic-gradient, labels,
+  and the landing math, so slice size always matches the real probability (uniform mode).
 - **Editing a dish** — each card has one **Edit** button opening `EditDishMenu`, a labelled
   action sheet that routes to rename / tags / change-photo (keeps the cards uncluttered);
   ♥ favourite and ✕ delete stay on the card for quick access.
@@ -209,6 +219,11 @@ by an inline script in `index.html` to avoid a flash, with `meta theme-color` ke
   then each person vetoes one dish or skips (`groupModal` stages 'size'→'veto'); vetoes go into
   `groupVetoesRef`, are consumed by the next spin via `buildPool`'s `excludeIds`, always leave
   ≥2 dishes, and clear on spin end.
+- **Shareable menus** — "Share menu" in the menu header builds a `#menu=<base64url>` link via
+  `encodeMenu` (name, emoji, dish names + tags only — no coords/images; capped + sanitised by
+  `decodeMenu`) and shares/copies it. Opening such a link decodes it into `importMenu` (lazy
+  state initialiser; hash cleaned via `replaceState`), and a confirm dialog adds it as a new
+  place — photos heal in on the receiving device.
 - **Installable (PWA)** — `public/manifest.webmanifest` (standalone, themed) + icon set + apple
   touch icon make it home-screen installable; `index.html` carries description + OG/Twitter meta
   (absolute `og.png`). All `public/` paths and the Vite `base` are **relative** (`./`) so they
