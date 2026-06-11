@@ -14,6 +14,20 @@ export function readWheelAngle(el) {
   return deg
 }
 
+// Build the eligible index pool for a spin: drop knocked-out dishes, any
+// explicitly excluded ids (group vetoes), and — when an alternative exists —
+// the immediately previous winner.
+export function buildPool(foods, { knockout = false, roundWon = [], excludeIds = [], lastWinnerId = null } = {}) {
+  let pool = foods.map((_, i) => i)
+  if (knockout) pool = pool.filter((i) => !roundWon.includes(foods[i].id))
+  if (excludeIds.length) pool = pool.filter((i) => !excludeIds.includes(foods[i].id))
+  if (pool.length > 1 && lastWinnerId) {
+    const filtered = pool.filter((i) => foods[i].id !== lastWinnerId)
+    if (filtered.length) pool = filtered
+  }
+  return pool
+}
+
 // Recency-weighted pick over candidate food indices: dishes appearing recently
 // in `historyNames` (lowercased, newest first) get lower weight, so the wheel
 // favours variety. Never-recent dishes get the highest weight.

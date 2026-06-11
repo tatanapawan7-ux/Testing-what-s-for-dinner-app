@@ -1,5 +1,34 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { weightedPick } from './spin'
+import { weightedPick, buildPool } from './spin'
+
+describe('buildPool', () => {
+  const f = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]
+
+  it('includes everything by default', () => {
+    expect(buildPool(f)).toEqual([0, 1, 2, 3])
+  })
+
+  it('drops knocked-out dishes only in knockout mode', () => {
+    expect(buildPool(f, { knockout: true, roundWon: ['b', 'd'] })).toEqual([0, 2])
+    expect(buildPool(f, { knockout: false, roundWon: ['b', 'd'] })).toEqual([0, 1, 2, 3])
+  })
+
+  it('drops vetoed ids', () => {
+    expect(buildPool(f, { excludeIds: ['a', 'c'] })).toEqual([1, 3])
+  })
+
+  it('avoids the previous winner when an alternative exists', () => {
+    expect(buildPool(f, { lastWinnerId: 'a' })).toEqual([1, 2, 3])
+    // …but keeps it when it is the only candidate left
+    expect(buildPool(f, { excludeIds: ['b', 'c', 'd'], lastWinnerId: 'a' })).toEqual([0])
+  })
+
+  it('stacks all filters together', () => {
+    expect(
+      buildPool(f, { knockout: true, roundWon: ['d'], excludeIds: ['a'], lastWinnerId: 'b' }),
+    ).toEqual([2])
+  })
+})
 
 afterEach(() => vi.restoreAllMocks())
 

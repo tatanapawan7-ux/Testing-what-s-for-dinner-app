@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { needsImage, searchFoodImages } from './lib/photos'
 import { uid, makeFood, makePlace, loadState, bootstrapPlaces } from './lib/storage'
 import { distanceMeters, GEO_RADIUS_M, searchNearbyRestaurants } from './lib/geo'
-import { weightedPick, readWheelAngle, SPIN_MS } from './lib/spin'
+import { weightedPick, buildPool, readWheelAngle, SPIN_MS } from './lib/spin'
 import { buildBackup, validateBackup, applyBackup } from './lib/backup'
 import { buildShareCard } from './lib/sharecard'
 import { celebrate, vibrate, getAudioContext, playFanfare, playWhoosh, playTick } from './lib/feedback'
@@ -15,6 +15,7 @@ import PlaceModal from './components/PlaceModal.jsx'
 import PhotoPicker from './components/PhotoPicker.jsx'
 import NearbyModal from './components/NearbyModal.jsx'
 import RenameModal from './components/RenameModal.jsx'
+import GroupModal from './components/GroupModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 
 /* -------------------------------------------------------------------------- */
@@ -42,6 +43,9 @@ export default function App() {
   const [importConfirm, setImportConfirm] = useState(null) // parsed backup awaiting confirm
   const [backupMsg, setBackupMsg] = useState('') // inline feedback by the footer buttons
   const [renameTarget, setRenameTarget] = useState(null) // food being renamed
+  // Group spin: { stage:'size' } → { stage:'veto', total, current, vetoed: [foodIds] }
+  const [groupModal, setGroupModal] = useState(null)
+  const groupVetoesRef = useRef([]) // vetoes applied to the very next spin only
   const [muted, setMuted] = useState(() => loadState('wfd-muted', false))
   // 'light' | 'dark' | null (= follow the system preference)
   const [theme, setTheme] = useState(() => loadState('wfd-theme', null))
@@ -123,11 +127,12 @@ export default function App() {
       else if (confirmClearHistory) setConfirmClearHistory(false)
       else if (importConfirm) setImportConfirm(null)
       else if (renameTarget) setRenameTarget(null)
+      else if (groupModal) setGroupModal(null)
       else if (winner) setWinner(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, renameTarget, winner])
+  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, renameTarget, groupModal, winner])
 
   /* ------------------------------- Derived -------------------------------- */
   const activePlace = useMemo(
@@ -483,15 +488,14 @@ export default function App() {
     // Resume the audio context on this user gesture so the win chime can play.
     if (!muted) getAudioContext()?.resume?.()
 
-    // Build the eligible pool, then pick the winner.
-    let pool = foods.map((_, i) => i)
-    if (knockout) pool = pool.filter((i) => !roundWon.includes(foods[i].id))
+    // Build the eligible pool (knock-outs, group vetoes, last winner), then pick.
+    const pool = buildPool(foods, {
+      knockout,
+      roundWon,
+      excludeIds: groupVetoesRef.current,
+      lastWinnerId: lastWinnerId.current,
+    })
     if (pool.length === 0) return // round complete (spin is disabled, but guard anyway)
-    // Avoid repeating the immediately previous winner when there's an alternative.
-    if (pool.length > 1 && lastWinnerId.current) {
-      const filtered = pool.filter((i) => foods[i].id !== lastWinnerId.current)
-      if (filtered.length) pool = filtered
-    }
     const winnerIndex = variety
       ? weightedPick(pool, foods, history.map((h) => h.name.toLowerCase()))
       : pool[Math.floor(Math.random() * pool.length)]
@@ -521,6 +525,7 @@ export default function App() {
     stopTicking()
     if (!isSpinning) return
     setIsSpinning(false)
+    groupVetoesRef.current = [] // group vetoes apply to one spin only
     const idx = winnerIndexRef.current
     if (idx == null || !foods[idx]) return
     const win = foods[idx]
@@ -548,6 +553,42 @@ export default function App() {
   function spinAgain() {
     setWinner(null)
     setTimeout(() => handleSpin(), 120)
+  }
+
+  /* ------------------------------ Group spin ------------------------------ */
+  // Pass-the-phone mode: each person may veto one dish, then the wheel spins
+  // among what's left. Vetoes apply to that one spin only.
+  function startGroupSpin() {
+    if (isSpinning || foods.length < 3) return
+    setGroupModal({ stage: 'size' })
+  }
+
+  function chooseGroupSize(total) {
+    setGroupModal({ stage: 'veto', total, current: 1, vetoed: [] })
+  }
+
+  // A veto is allowed only while ≥2 dishes would remain.
+  function groupVeto(foodId) {
+    setGroupModal((m) => {
+      if (!m || m.stage !== 'veto') return m
+      const vetoed =
+        m.vetoed.includes(foodId) || m.vetoed.length >= foods.length - 2
+          ? m.vetoed
+          : [...m.vetoed, foodId]
+      return advanceGroup({ ...m, vetoed })
+    })
+  }
+
+  function groupSkip() {
+    setGroupModal((m) => (m && m.stage === 'veto' ? advanceGroup(m) : m))
+  }
+
+  // Next person, or — after the last one — fire the spin with the vetoes.
+  function advanceGroup(m) {
+    if (m.current < m.total) return { ...m, current: m.current + 1 }
+    groupVetoesRef.current = m.vetoed
+    setTimeout(() => handleSpin(), 150)
+    return null
   }
 
   // Share the winning pick. Preferred: a canvas-rendered image card via the
@@ -765,6 +806,8 @@ export default function App() {
           onToggleVariety={() => setVariety((v) => !v)}
           onToggleKnockout={() => setKnockout((k) => !k)}
           onResetRound={resetRound}
+          canGroup={foods.length >= 3 && !isSpinning}
+          onGroupSpin={startGroupSpin}
         />
 
         <Menu
@@ -907,6 +950,18 @@ export default function App() {
           }. Your current places, menus, and history will be replaced.`}
           onConfirm={confirmImport}
           onCancel={() => setImportConfirm(null)}
+        />
+      )}
+
+      {/* Group spin (pass-the-phone vetoes) */}
+      {groupModal && (
+        <GroupModal
+          modal={groupModal}
+          foods={foods}
+          onChooseSize={chooseGroupSize}
+          onVeto={groupVeto}
+          onSkip={groupSkip}
+          onClose={() => setGroupModal(null)}
         />
       )}
 

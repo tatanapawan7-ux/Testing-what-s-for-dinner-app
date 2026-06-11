@@ -27,6 +27,8 @@ export default function Wheel({
   onToggleVariety,
   onToggleKnockout,
   onResetRound,
+  canGroup,
+  onGroupSpin,
 }) {
   // conic-gradient background for the wheel slices.
   const wheelBackground = useMemo(() => {
@@ -158,6 +160,14 @@ export default function Wheel({
           }`}
         >
           Knock-out
+        </button>
+        <button
+          onClick={onGroupSpin}
+          disabled={!canGroup}
+          title={canGroup ? 'Everyone vetoes one, then spin' : 'Needs at least 3 dishes'}
+          className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink/70 shadow-sm transition-all duration-300 hover:border-terra/40 disabled:opacity-50"
+        >
+          👥 Group spin
         </button>
       </div>
       {knockout && (
