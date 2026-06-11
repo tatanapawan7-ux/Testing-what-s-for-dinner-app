@@ -18,7 +18,11 @@ a celebratory winner modal and a persistent history of past spins.
   **photo picker** of matching images (TheMealDB + Openverse) so the picture fits the food —
   or paste your own image link, and change any dish's photo later
 - 🎉 **Winner modal** with a confetti burst + celebratory chime (sound has a mute toggle),
-  and a **Share this pick** button (native share sheet → clipboard fallback)
+  and a **Share this pick** button — a generated photo card via the native share sheet,
+  with text-share and clipboard fallbacks
+- 👥 **Group spin** — pass the phone around, everyone vetoes one dish, and the wheel
+  decides among what's left
+- 🌙 **Dark mode** — a warm ember palette, following your system or toggled manually
 - 📊 **Dinner stats** — total decided, eaten, and your top pick, summarised at a glance
 - 🕑 **Dinner history** timeline (tagged by place), persisted in `localStorage`; remove a
   single spin or clear the whole log
@@ -26,7 +30,8 @@ a celebratory winner modal and a persistent history of past spins.
   import it on any device (footer links)
 - ♿ **Accessible** — labelled dialogs, Escape-to-close, screen-reader winner announcements,
   and `prefers-reduced-motion` support
-- 📲 **Installable PWA** — add it to your home screen for an app-like, full-screen experience
+- 📲 **Installable PWA** — add it to your home screen and it **works offline** (your menus
+  and history live on your device)
 - 📱 Responsive, mobile-first UI built with Tailwind CSS
 
 ## How to Use

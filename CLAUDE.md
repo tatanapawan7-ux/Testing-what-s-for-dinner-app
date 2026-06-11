@@ -60,7 +60,7 @@ CI (the deploy workflow) runs lint + tests before building, so a failure blocks 
 
 ```
 index.html            # Vite entry (title + manifest, icons, OG/Twitter meta)
-vite.config.js        # react() + tailwindcss() plugins
+vite.config.js        # react() + tailwindcss() + VitePWA (offline service worker)
 eslint.config.js      # ESLint flat config
 public/
   favicon.svg            # on-brand "decision wheel" mark
@@ -88,13 +88,15 @@ src/
     PhotoPicker.jsx      # photo search results + paste-a-link
     NearbyModal.jsx      # OSM restaurant picker (radius + type filters)
     RenameModal.jsx      # rename a dish (duplicate-blocked)
+    GroupModal.jsx       # pass-the-phone group vetoes, then spin
   lib/                # pure logic, each with a colocated *.test.js
     photos.js            # placeholderImage, needsImage, searchFoodImages (TheMealDB+Openverse)
     storage.js           # uid, makeFood, makePlace, loadState, bootstrapPlaces
     geo.js               # distanceMeters, formatDistance, searchNearbyRestaurants (Overpass)
-    spin.js              # weightedPick, readWheelAngle, SPIN_MS
+    spin.js              # buildPool, weightedPick, readWheelAngle, SPIN_MS
     feedback.js          # celebrate (confetti), vibrate, Web Audio sounds (untested: browser-only)
     backup.js            # buildBackup, validateBackup, applyBackup (export/import)
+    sharecard.js         # canvas-rendered 1080² share PNG (untested: browser-only)
 ```
 
 The icon set + `og.png` were generated from hand-written SVG via `sharp` (a one-off
@@ -111,7 +113,10 @@ cream" theme**; the palette + fonts live in a CSS-first `@theme { … }` block i
 background, soft static ambient glows (`body::before`) and a faint grain (`body::after`);
 there's an on-brand `:focus-visible` ring and `::selection` tint. Custom animations
 (`pop-in`, `fade-in`, `float-up`, `glow-pulse`, `ping-once`) are plain `@keyframes`, all
-disabled/neutralised under `prefers-reduced-motion`. The aesthetic is deliberately restrained
+disabled/neutralised under `prefers-reduced-motion`. **Dark mode**: an `html.dark` block
+re-points the theme tokens (warm "ember & cocoa" palette), so token-based utilities flip
+wholesale; toggled via 🌙/☀️ (persisted `wfd-theme`, defaults to system), applied pre-paint
+by an inline script in `index.html` to avoid a flash, with `meta theme-color` kept in sync. The aesthetic is deliberately restrained
 (no looping shimmer/breathing effects) for a refined, professional feel.
 
 ## Architecture (`src/App.jsx`)
@@ -166,7 +171,9 @@ disabled/neutralised under `prefers-reduced-motion`. The aesthetic is deliberate
   celebrates: `celebrate()` fires a `canvas-confetti` burst (skipped under `prefers-reduced-motion`)
   and `playFanfare()` plays a Web Audio chime + a `vibrate()` haptic buzz — all gated by the
   persisted mute toggle (`wfd-muted`). The winner modal also has a **Share this pick**
-  (`shareWinner`) — Web Share API with a clipboard fallback (`shareCopied` feedback).
+  (`shareWinner`): a canvas-rendered **image card** (`buildShareCard`, pre-rendered when the
+  winner appears so file-sharing stays inside the tap's user-activation window) via the Web
+  Share API, falling back to plain text share, then the clipboard (`shareCopied` feedback).
 - **Spin sounds** (Web Audio, no assets) — `playWhoosh()` on launch, then `startTicking()` runs a
   `requestAnimationFrame` loop that reads the wheel's real rotation (`readWheelAngle`) and
   `playTick()`s as each segment passes the pointer, so clicks slow with the wheel; `stopTicking()`
@@ -180,10 +187,16 @@ disabled/neutralised under `prefers-reduced-motion`. The aesthetic is deliberate
   (`buildBackup`); "Import data" parses + `validateBackup`s a chosen file, confirms via a
   modal (it overwrites), then `applyBackup` writes storage and reloads so all state
   rehydrates consistently.
+- **Group spin** — "👥 Group spin" under the wheel (needs ≥3 dishes): choose group size (2–6),
+  then each person vetoes one dish or skips (`groupModal` stages 'size'→'veto'); vetoes go into
+  `groupVetoesRef`, are consumed by the next spin via `buildPool`'s `excludeIds`, always leave
+  ≥2 dishes, and clear on spin end.
 - **Installable (PWA)** — `public/manifest.webmanifest` (standalone, themed) + icon set + apple
   touch icon make it home-screen installable; `index.html` carries description + OG/Twitter meta
   (absolute `og.png`). All `public/` paths and the Vite `base` are **relative** (`./`) so they
-  resolve under the GitHub Pages subpath.
+  resolve under the GitHub Pages subpath. `vite-plugin-pwa` precaches the app shell
+  (autoUpdate; `og.png` excluded) so the installed app **works fully offline** — remote food
+  photos fall back to placeholders.
 - **Edge cases** — empty/duplicate (per-place, case-insensitive) input blocked, removing a food
   asks via a confirm dialog (`confirmDelete`) and is blocked below 2 items, spin disabled while
   spinning or under 2 options, empty place shows a hint. Two
