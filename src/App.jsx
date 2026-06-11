@@ -22,6 +22,7 @@ import GroupModal from './components/GroupModal.jsx'
 import TagModal from './components/TagModal.jsx'
 import TagFilter from './components/TagFilter.jsx'
 import EditDishMenu from './components/EditDishMenu.jsx'
+import SpinHelpModal from './components/SpinHelpModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 
 /* -------------------------------------------------------------------------- */
@@ -51,6 +52,7 @@ export default function App() {
   const [renameTarget, setRenameTarget] = useState(null) // food being renamed
   const [tagTarget, setTagTarget] = useState(null) // food whose tags are being edited
   const [editDish, setEditDish] = useState(null) // food whose edit action sheet is open
+  const [spinHelp, setSpinHelp] = useState(false) // "what do these settings do?" popup
   const [activeTags, setActiveTags] = useState([]) // wheel filter (transient, per place)
   // Group spin: { stage:'size' } → { stage:'veto', total, current, vetoed: [foodIds] }
   const [groupModal, setGroupModal] = useState(null)
@@ -149,12 +151,13 @@ export default function App() {
       else if (renameTarget) setRenameTarget(null)
       else if (tagTarget) setTagTarget(null)
       else if (editDish) setEditDish(null)
+      else if (spinHelp) setSpinHelp(false)
       else if (groupModal) setGroupModal(null)
       else if (winner) setWinner(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, importMenu, renameTarget, tagTarget, editDish, groupModal, winner])
+  }, [photoPicker, placeModal, nearbyModal, confirmDelete, confirmClearHistory, importConfirm, importMenu, renameTarget, tagTarget, editDish, spinHelp, groupModal, winner])
 
   /* ------------------------------- Derived -------------------------------- */
   const activePlace = useMemo(
@@ -949,6 +952,7 @@ export default function App() {
           onResetRound={resetRound}
           canGroup={wheelFoods.length >= 3 && !isSpinning}
           onGroupSpin={startGroupSpin}
+          onHelp={() => setSpinHelp(true)}
         />
 
         <Menu
@@ -1125,6 +1129,9 @@ export default function App() {
       {tagTarget && (
         <TagModal target={tagTarget} onSave={handleTags} onClose={() => setTagTarget(null)} />
       )}
+
+      {/* What do the spin settings do? */}
+      {spinHelp && <SpinHelpModal onClose={() => setSpinHelp(false)} />}
 
       {/* Import a shared menu (from a #menu= link) */}
       {importMenu && (

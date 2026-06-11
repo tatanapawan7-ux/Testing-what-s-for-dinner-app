@@ -32,6 +32,7 @@ export default function Wheel({
   onResetRound,
   canGroup,
   onGroupSpin,
+  onHelp,
 }) {
   // Slice geometry (favorites get wider slices when the boost is on) and the
   // conic-gradient background built from it.
@@ -147,6 +148,7 @@ export default function Wheel({
         <button
           onClick={onToggleVariety}
           aria-pressed={variety}
+          title="Recent meals become less likely (ratings & favorites count too)"
           className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
             variety
               ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)]'
@@ -158,6 +160,7 @@ export default function Wheel({
         <button
           onClick={onToggleKnockout}
           aria-pressed={knockout}
+          title="Winners are removed until every dish has had a turn"
           className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${
             knockout
               ? 'bg-gradient-to-br from-terra to-terra-light text-white shadow-[0_8px_20px_-6px_rgba(194,99,47,0.5)]'
@@ -187,6 +190,14 @@ export default function Wheel({
           className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink/70 shadow-sm transition-all duration-300 hover:border-terra/40 disabled:opacity-50"
         >
           👥 Group spin
+        </button>
+        <button
+          onClick={onHelp}
+          aria-label="What do these settings do?"
+          title="What do these settings do?"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-sm font-semibold text-ink/60 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+        >
+          ?
         </button>
       </div>
       {knockout && (
