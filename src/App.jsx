@@ -137,7 +137,7 @@ export default function App() {
   }, [backupMsg])
   useEffect(() => {
     if (!spinHint) return
-    const t = setTimeout(() => setSpinHint(''), 4000)
+    const t = setTimeout(() => setSpinHint(''), 30000)
     return () => clearTimeout(t)
   }, [spinHint])
 
