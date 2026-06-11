@@ -180,8 +180,14 @@ export default function App() {
     const chips = usedTags(foods)
     return foods.some((f) => f.fav) ? [{ key: 'fav', label: '♥ Favorites' }, ...chips] : chips
   }, [foods])
+  // What's actually ON the wheel: in knock-out mode, already-won dishes are
+  // removed (not just excluded from the pick) so their slices disappear.
+  const remainingFoods = useMemo(
+    () => (knockout ? wheelFoods.filter((f) => !roundWon.includes(f.id)) : wheelFoods),
+    [knockout, wheelFoods, roundWon],
+  )
   // Slice geometry (favorites get wider slices when boosted) and star averages.
-  const layout = useMemo(() => sliceLayout(wheelFoods, favBoost), [wheelFoods, favBoost])
+  const layout = useMemo(() => sliceLayout(remainingFoods, favBoost), [remainingFoods, favBoost])
   const ratings = useMemo(() => averageRatings(history), [history])
 
   // Heal seeded / legacy foods (no image, or a dead Unsplash URL) by fetching a
@@ -506,7 +512,7 @@ export default function App() {
     if (muted) return
     const el = wheelRef.current
     if (!el) return
-    const seg = 360 / Math.max(wheelFoods.length, 1)
+    const seg = 360 / Math.max(remainingFoods.length, 1)
     let prev = readWheelAngle(el)
     let traveled = 0
     let nextTick = seg
@@ -540,21 +546,20 @@ export default function App() {
 
   /* -------------------------------- Spin --------------------------------- */
   function handleSpin() {
-    if (isSpinning || wheelFoods.length < 2) return
+    // In knock-out the wheel shrinks to the last survivor, so 1 is spinnable.
+    if (isSpinning || remainingFoods.length < (knockout ? 1 : 2)) return
     setError('')
 
     // Resume the audio context on this user gesture so the win chime can play.
     if (!muted) getAudioContext()?.resume?.()
 
-    // Spin over the currently filtered dishes; capture them so the result is
-    // stable even if the filter or menu changes during the spin.
-    const list = wheelFoods
+    // Spin over the dishes actually on the wheel (won ones already removed);
+    // capture them so the result is stable even if the menu changes mid-spin.
+    const list = remainingFoods
     spinListRef.current = list
 
-    // Build the eligible pool (knock-outs, group vetoes, last winner), then pick.
+    // Build the eligible pool (group vetoes, last winner), then pick.
     const pool = buildPool(list, {
-      knockout,
-      roundWon,
       excludeIds: groupVetoesRef.current,
       lastWinnerId: lastWinnerId.current,
     })
@@ -638,9 +643,10 @@ export default function App() {
   function toggleKnockout() {
     const next = !knockout
     setKnockout(next)
+    if (next) setRoundWon([]) // turning it on starts a fresh round (full wheel)
     setSpinHint(
       next
-        ? 'Knock-out on — each winner is removed until every dish has had a turn.'
+        ? 'Knock-out on — each winner leaves the wheel until every dish has had a turn.'
         : 'Knock-out off — winners stay on the wheel.',
     )
   }
@@ -658,7 +664,7 @@ export default function App() {
   // Pass-the-phone mode: each person may veto one dish, then the wheel spins
   // among what's left. Vetoes apply to that one spin only.
   function startGroupSpin() {
-    if (isSpinning || wheelFoods.length < 3) return
+    if (isSpinning || remainingFoods.length < 3) return
     setGroupModal({ stage: 'size' })
   }
 
@@ -881,10 +887,10 @@ export default function App() {
     setStatus(`✨ Added "${importMenu.name}" with ${importMenu.foods.length} dishes`)
   }
 
-  const roundComplete =
-    knockout && wheelFoods.length > 0 && wheelFoods.every((f) => roundWon.includes(f.id))
-  const remaining = knockout ? wheelFoods.filter((f) => !roundWon.includes(f.id)).length : 0
-  const canSpin = wheelFoods.length >= 2 && !isSpinning && !roundComplete
+  // Round is complete once every dish in the (filtered) menu has been knocked out.
+  const roundComplete = knockout && wheelFoods.length > 0 && remainingFoods.length === 0
+  const remaining = remainingFoods.length
+  const canSpin = remainingFoods.length >= (knockout ? 1 : 2) && !isSpinning && !roundComplete
   const editingPlace = placeModal?.id ? places.find((p) => p.id === placeModal.id) : null
 
   /* -------------------------------------------------------------------------- */
@@ -960,7 +966,7 @@ export default function App() {
         )}
 
         <Wheel
-          foods={wheelFoods}
+          foods={remainingFoods}
           favBoost={favBoost}
           showFavBoost={foods.some((f) => f.fav)}
           rotation={rotation}
@@ -968,13 +974,16 @@ export default function App() {
           canSpin={canSpin}
           roundComplete={roundComplete}
           remaining={remaining}
+          roundTotal={wheelFoods.length}
           knockout={knockout}
           variety={variety}
           error={error}
           emptyLabel={
-            activeTags.length
-              ? 'No dishes match these filters'
-              : 'Add some food below to fill the wheel'
+            roundComplete
+              ? 'Every dish has had a turn — reset the round to go again'
+              : activeTags.length
+                ? 'No dishes match these filters'
+                : 'Add some food below to fill the wheel'
           }
           wheelRef={wheelRef}
           onSpin={handleSpin}
@@ -983,7 +992,7 @@ export default function App() {
           onToggleKnockout={toggleKnockout}
           onToggleFavBoost={toggleFavBoost}
           onResetRound={resetRound}
-          canGroup={wheelFoods.length >= 3 && !isSpinning}
+          canGroup={remainingFoods.length >= 3 && !isSpinning}
           onGroupSpin={startGroupSpin}
           hint={spinHint}
         />
@@ -1138,7 +1147,7 @@ export default function App() {
       {groupModal && (
         <GroupModal
           modal={groupModal}
-          foods={wheelFoods}
+          foods={remainingFoods}
           onChooseSize={chooseGroupSize}
           onVeto={groupVeto}
           onSkip={groupSkip}

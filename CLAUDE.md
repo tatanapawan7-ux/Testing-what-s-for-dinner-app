@@ -169,10 +169,14 @@ by an inline script in `index.html` to avoid a flash, with `meta theme-color` ke
   `wfd-history`; spin prefs → `wfd-muted`, `wfd-variety`, `wfd-knockout`, `wfd-round`.
 - **Wheel** — CSS `conic-gradient` slices + rotated labels; spin sets a large `rotation` with a
   `cubic-bezier(0.1, 0.8, 0.3, 1)` transition solved so the precomputed winner lands under the
-  top pointer. **Smarter picking** (`handleSpin`): builds an eligible index pool — excludes the
-  immediate previous winner (`lastWinnerId`), and, in **knock-out** mode, foods already in
-  `roundWon` (cleared by `resetRound`); then picks uniformly or, when **variety** is on, via
-  `weightedPick()` (recency-weighted from `history`). The toggles + a round status sit under the
+  top pointer. **Knock-out** mode removes each winner from the wheel itself — `remainingFoods`
+  (`= wheelFoods` minus `roundWon` when knock-out is on) drives the slices, labels, landing math
+  and the pick, so won dishes visibly vanish; toggling knock-out on starts a fresh round
+  (clears `roundWon`), spinning down to the last survivor (min 1 to spin) then `roundComplete`
+  (reset via `resetRound`). **Smarter picking** (`handleSpin`): `buildPool` over `remainingFoods`
+  excludes the immediate previous winner (`lastWinnerId`) + group vetoes, then picks uniformly
+  (or 2:1 for boosted favorites) or, when **variety** is on, via `weightedPick()`
+  (recency-weighted from `history`, plus ratings + favorites). The toggles + a round status sit under the
   wheel; flipping a toggle shows a one-line state-aware hint beneath the row (`spinHint`,
   auto-clears) explaining what the new state means. The winner modal has a
   **Spin again** (`spinAgain`). `handleSpinEnd` reveals the winner

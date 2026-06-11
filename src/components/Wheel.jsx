@@ -19,6 +19,7 @@ export default function Wheel({
   canSpin,
   roundComplete,
   remaining,
+  roundTotal,
   knockout,
   variety,
   error,
@@ -216,9 +217,9 @@ export default function Wheel({
           ) : (
             <>
               <span>
-                {remaining} of {foods.length} left this round
+                {remaining} of {roundTotal} left this round
               </span>
-              {remaining < foods.length && (
+              {remaining < roundTotal && (
                 <button
                   onClick={onResetRound}
                   className="rounded-full border border-line bg-surface px-3 py-1 font-medium text-ink/80 shadow-sm transition-all duration-300 hover:border-terra/40"
