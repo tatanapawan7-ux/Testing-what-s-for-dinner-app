@@ -4,6 +4,7 @@ import { uid, makeFood, makePlace, loadState, bootstrapPlaces } from './lib/stor
 import { distanceMeters, GEO_RADIUS_M, searchNearbyRestaurants } from './lib/geo'
 import { weightedPick, readWheelAngle, SPIN_MS } from './lib/spin'
 import { buildBackup, validateBackup, applyBackup } from './lib/backup'
+import { buildShareCard } from './lib/sharecard'
 import { celebrate, vibrate, getAudioContext, playFanfare, playWhoosh, playTick } from './lib/feedback'
 import Wheel from './components/Wheel.jsx'
 import PlaceBar from './components/PlaceBar.jsx'
@@ -549,12 +550,42 @@ export default function App() {
     setTimeout(() => handleSpin(), 120)
   }
 
-  // Share the winning pick — native share sheet, with a clipboard fallback.
+  // Share the winning pick. Preferred: a canvas-rendered image card via the
+  // native share sheet (pre-rendered when the winner appears, so the share
+  // stays inside the tap's user-activation window); falls back to plain text
+  // share, then to the clipboard.
+  const shareCardRef = useRef(null)
+  useEffect(() => {
+    shareCardRef.current = null
+    if (!winner) return
+    let cancelled = false
+    buildShareCard(winner).then((blob) => {
+      if (!cancelled) shareCardRef.current = blob
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [winner])
+
   async function shareWinner(food) {
     if (!food) return
     const url = typeof window !== 'undefined' ? window.location.href : ''
     const text = `Tonight's pick: ${food.name}. Decided with the What's for Dinner wheel.`
     if (typeof navigator !== 'undefined' && navigator.share) {
+      // Rich image card first, when the platform can share files.
+      const blob = shareCardRef.current
+      if (blob && navigator.canShare) {
+        const file = new File([blob], 'tonights-pick.png', { type: 'image/png' })
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: "What's for Dinner?", text: `${text} ${url}` })
+            return
+          } catch (e) {
+            if (e?.name === 'AbortError') return // user closed the sheet
+            // otherwise fall through to the plain share
+          }
+        }
+      }
       try {
         await navigator.share({ title: "What's for Dinner?", text, url })
       } catch {
