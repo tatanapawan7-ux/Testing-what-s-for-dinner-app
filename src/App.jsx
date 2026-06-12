@@ -5,7 +5,7 @@ import { distanceMeters, GEO_RADIUS_M, searchNearbyRestaurants } from './lib/geo
 import { weightedPick, buildPool, pickIndexWeighted, sliceLayout, readWheelAngle, SPIN_MS } from './lib/spin'
 import { averageRatings, topRated } from './lib/ratings'
 import { encodeMenu, decodeMenu } from './lib/sharemenu'
-import { shakeDelta, isShake } from './lib/shake'
+import { shakeDelta, isShake, SHAKE_SAMPLE_MS } from './lib/shake'
 import { buildBackup, validateBackup, applyBackup } from './lib/backup'
 import { buildShareCard } from './lib/sharecard'
 import { filterByTags, usedTags } from './lib/tags'
@@ -83,7 +83,7 @@ export default function App() {
   const [winner, setWinner] = useState(null) // food object once spin resolves
   const winnerIndexRef = useRef(null)
   const spinListRef = useRef([]) // the exact list a spin is resolving over
-  const shakeRef = useRef({ x: null, y: null, z: null, lastAt: 0 }) // last motion reading
+  const shakeRef = useRef({ x: null, y: null, z: null, sampledAt: 0, lastAt: 0 }) // last sampled reading
   const onShakeRef = useRef(() => {}) // latest "what a shake should do", refreshed each render
   const wheelRef = useRef(null) // the rotating disc, read for spin tick sounds
   const tickRafRef = useRef(null)
@@ -939,23 +939,42 @@ export default function App() {
   // Listen for device shakes only while enabled.
   useEffect(() => {
     if (!shake) return
+    let gotEvents = false
+    const s = shakeRef.current
     function onMotion(e) {
-      const a = e.accelerationIncludingGravity
+      gotEvents = true
+      const a = e.accelerationIncludingGravity ?? e.acceleration
       if (!a || a.x == null) return
-      const s = shakeRef.current
-      if (s.x !== null) {
-        const now = Date.now()
-        if (isShake(shakeDelta(s, a), now, s.lastAt)) {
-          s.lastAt = now
-          onShakeRef.current()
-        }
+      const now = Date.now()
+      if (s.x === null) {
+        Object.assign(s, { x: a.x, y: a.y, z: a.z, sampledAt: now })
+        return
       }
-      s.x = a.x
-      s.y = a.y
-      s.z = a.z
+      // Compare sparsely-sampled readings — per-frame deltas are too small.
+      if (now - s.sampledAt < SHAKE_SAMPLE_MS) return
+      if (isShake(shakeDelta(s, a), now, s.lastAt)) {
+        s.lastAt = now
+        onShakeRef.current()
+      }
+      Object.assign(s, { x: a.x, y: a.y, z: a.z, sampledAt: now })
     }
     window.addEventListener('devicemotion', onMotion)
-    return () => window.removeEventListener('devicemotion', onMotion)
+    // iOS forgets motion permission between sessions: if the toggle was
+    // restored as ON but no readings arrive, turn it off and say why —
+    // otherwise it would just silently do nothing.
+    const probe = setTimeout(() => {
+      const needsPermission =
+        typeof window.DeviceMotionEvent?.requestPermission === 'function'
+      if (!gotEvents && needsPermission) {
+        setShake(false)
+        setStatus('🤳 Tap shake-to-spin again to re-enable it.')
+      }
+    }, 3000)
+    return () => {
+      clearTimeout(probe)
+      window.removeEventListener('devicemotion', onMotion)
+      s.x = null // fresh baseline next time it's enabled
+    }
   }, [shake])
 
   /* -------------------------------------------------------------------------- */
