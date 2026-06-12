@@ -9,7 +9,7 @@ a celebratory winner modal and a persistent history of past spins.
 ## Features
 
 - 🎡 **Interactive decision wheel** with smooth, eased spin animation, spin sounds, and
-  optional haptic buzz on mobile
+  optional haptic buzz on mobile — plus opt-in **🤳 shake-to-spin**
 - 📍 **Location profiles** — separate menus per place (Home, Mall, Work…), with optional
   GPS "use my location" auto-switch to the nearest place you've pinned
 - 🍴 **Restaurants near me** — pull real nearby restaurants from OpenStreetMap (keyless, free)

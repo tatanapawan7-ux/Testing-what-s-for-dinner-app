@@ -100,6 +100,7 @@ src/
     tags.js              # TAGS catalogue, filterByTags, usedTags
     ratings.js           # averageRatings, topRated (star ratings live on history entries)
     sharemenu.js         # encodeMenu/decodeMenu — menus shared as base64url in the URL hash
+    shake.js             # shakeDelta / isShake — shake-to-spin detection math
     feedback.js          # celebrate (confetti), vibrate, Web Audio sounds (untested: browser-only)
     backup.js            # buildBackup, validateBackup, applyBackup (export/import)
     sharecard.js         # canvas-rendered 1080² share PNG (untested: browser-only)
@@ -166,7 +167,14 @@ by an inline script in `index.html` to avoid a flash, with `meta theme-color` ke
   contributors) is shown in the picker.
 - **Persistence** — `{ activePlaceId, places }` → `localStorage` key `wfd-places-v1` via
   `bootstrapPlaces()` (migrates an old flat `wfd-foods` list into a "Home" place); history →
-  `wfd-history`; spin prefs → `wfd-muted`, `wfd-variety`, `wfd-knockout`, `wfd-round`.
+  `wfd-history`; spin prefs → `wfd-muted`, `wfd-variety`, `wfd-knockout`, `wfd-round`,
+  `wfd-favboost`, `wfd-shake`; theme → `wfd-theme`.
+- **Shake to spin** — opt-in 🤳 toggle (top-right cluster, touch devices only via
+  `(pointer: coarse)`; persisted `wfd-shake`). Enabling calls
+  `DeviceMotionEvent.requestPermission()` inside the tap (iOS 13+). A `devicemotion` listener
+  (active only while on) computes `shakeDelta`/`isShake` (`lib/shake.js`) and fires
+  `onShakeRef.current()` — a render-refreshed closure that calls `handleSpin()` only when
+  `canSpin && !anyOverlayOpen`. Needs HTTPS (live site / not plain-HTTP localhost).
 - **Wheel** — CSS `conic-gradient` slices + rotated labels; spin sets a large `rotation` with a
   `cubic-bezier(0.1, 0.8, 0.3, 1)` transition solved so the precomputed winner lands under the
   top pointer. **Knock-out** mode removes each winner from the wheel itself — `remainingFoods`

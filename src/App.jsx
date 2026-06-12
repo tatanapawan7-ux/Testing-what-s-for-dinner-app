@@ -5,6 +5,7 @@ import { distanceMeters, GEO_RADIUS_M, searchNearbyRestaurants } from './lib/geo
 import { weightedPick, buildPool, pickIndexWeighted, sliceLayout, readWheelAngle, SPIN_MS } from './lib/spin'
 import { averageRatings, topRated } from './lib/ratings'
 import { encodeMenu, decodeMenu } from './lib/sharemenu'
+import { shakeDelta, isShake } from './lib/shake'
 import { buildBackup, validateBackup, applyBackup } from './lib/backup'
 import { buildShareCard } from './lib/sharecard'
 import { filterByTags, usedTags } from './lib/tags'
@@ -57,6 +58,10 @@ export default function App() {
   const [groupModal, setGroupModal] = useState(null)
   const groupVetoesRef = useRef([]) // vetoes applied to the very next spin only
   const [muted, setMuted] = useState(() => loadState('wfd-muted', false))
+  const [shake, setShake] = useState(() => loadState('wfd-shake', false)) // shake-to-spin
+  const [isTouch] = useState(
+    () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches,
+  )
   // 'light' | 'dark' | null (= follow the system preference)
   const [theme, setTheme] = useState(() => loadState('wfd-theme', null))
   const [shareCopied, setShareCopied] = useState(false) // brief "copied!" feedback
@@ -78,6 +83,8 @@ export default function App() {
   const [winner, setWinner] = useState(null) // food object once spin resolves
   const winnerIndexRef = useRef(null)
   const spinListRef = useRef([]) // the exact list a spin is resolving over
+  const shakeRef = useRef({ x: null, y: null, z: null, lastAt: 0 }) // last motion reading
+  const onShakeRef = useRef(() => {}) // latest "what a shake should do", refreshed each render
   const wheelRef = useRef(null) // the rotating disc, read for spin tick sounds
   const tickRafRef = useRef(null)
 
@@ -93,6 +100,9 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('wfd-muted', JSON.stringify(muted))
   }, [muted])
+  useEffect(() => {
+    localStorage.setItem('wfd-shake', JSON.stringify(shake))
+  }, [shake])
   // Apply the theme: toggle the .dark class and keep browser chrome in sync.
   const isDark =
     theme === 'dark' ||
@@ -660,6 +670,29 @@ export default function App() {
     )
   }
 
+  // Shake-to-spin: enabling requests motion access on iOS (must run inside the
+  // tap), then the devicemotion effect below listens while `shake` is on.
+  async function toggleShake() {
+    if (shake) {
+      setShake(false)
+      return
+    }
+    const DME = typeof window !== 'undefined' && window.DeviceMotionEvent
+    if (DME && typeof DME.requestPermission === 'function') {
+      try {
+        if ((await DME.requestPermission()) !== 'granted') {
+          setStatus('⚠️ Motion access denied — shake to spin needs it.')
+          return
+        }
+      } catch {
+        setStatus('⚠️ Motion isn’t available on this device.')
+        return
+      }
+    }
+    setShake(true)
+    setStatus('🤳 Shake to spin on — give your phone a shake!')
+  }
+
   /* ------------------------------ Group spin ------------------------------ */
   // Pass-the-phone mode: each person may veto one dish, then the wheel spins
   // among what's left. Vetoes apply to that one spin only.
@@ -893,6 +926,38 @@ export default function App() {
   const canSpin = remainingFoods.length >= (knockout ? 1 : 2) && !isSpinning && !roundComplete
   const editingPlace = placeModal?.id ? places.find((p) => p.id === placeModal.id) : null
 
+  /* ----------------------------- Shake to spin ---------------------------- */
+  // Any overlay open ⇒ ignore shakes (don't spin behind a dialog).
+  const anyOverlayOpen = Boolean(
+    winner || placeModal || photoPicker || nearbyModal || confirmDelete || confirmClearHistory ||
+      importConfirm || importMenu || renameTarget || tagTarget || editDish || groupModal,
+  )
+  // Keep the shake action pointing at the latest guards/handler (no stale closure).
+  onShakeRef.current = () => {
+    if (canSpin && !anyOverlayOpen) handleSpin()
+  }
+  // Listen for device shakes only while enabled.
+  useEffect(() => {
+    if (!shake) return
+    function onMotion(e) {
+      const a = e.accelerationIncludingGravity
+      if (!a || a.x == null) return
+      const s = shakeRef.current
+      if (s.x !== null) {
+        const now = Date.now()
+        if (isShake(shakeDelta(s, a), now, s.lastAt)) {
+          s.lastAt = now
+          onShakeRef.current()
+        }
+      }
+      s.x = a.x
+      s.y = a.y
+      s.z = a.z
+    }
+    window.addEventListener('devicemotion', onMotion)
+    return () => window.removeEventListener('devicemotion', onMotion)
+  }, [shake])
+
   /* -------------------------------------------------------------------------- */
   return (
     <div className="min-h-screen text-ink">
@@ -920,6 +985,19 @@ export default function App() {
           >
             {muted ? '🔇' : '🔊'}
           </button>
+          {isTouch && (
+            <button
+              onClick={toggleShake}
+              aria-pressed={shake}
+              aria-label={shake ? 'Turn off shake to spin' : 'Turn on shake to spin'}
+              title="Shake to spin"
+              className={`flex h-10 w-10 items-center justify-center rounded-full border text-base shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${
+                shake ? 'border-terra bg-terra/15 text-terra' : 'border-line bg-surface'
+              }`}
+            >
+              🤳
+            </button>
+          )}
         </div>
 
         {/* Header */}
