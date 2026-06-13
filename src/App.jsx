@@ -589,7 +589,7 @@ export default function App() {
     let delta = targetMod - currentMod
     if (delta < 0) delta += 360
 
-    const fullSpins = 6
+    const fullSpins = 7
     setRotation(rotation + fullSpins * 360 + delta)
     setIsSpinning(true)
 

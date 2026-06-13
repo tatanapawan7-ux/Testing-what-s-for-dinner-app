@@ -1,6 +1,6 @@
 // Winner-picking + wheel-rotation logic.
 
-export const SPIN_MS = 4800
+export const SPIN_MS = 6000
 
 // Read the wheel's current visual rotation (degrees, 0–360) from its transform.
 export function readWheelAngle(el) {

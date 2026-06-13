@@ -91,7 +91,7 @@ export default function Wheel({
               background: wheelBackground,
               transform: `rotate(${rotation}deg)`,
               transition: isSpinning
-                ? `transform ${SPIN_MS}ms cubic-bezier(0.1, 0.8, 0.3, 1)`
+                ? `transform ${SPIN_MS}ms cubic-bezier(0.12, 0.82, 0.1, 1)`
                 : 'none',
             }}
           >

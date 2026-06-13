@@ -177,7 +177,7 @@ keeps the class + `meta theme-color` in sync when the system preference changes.
   `onShakeRef.current()` — a render-refreshed closure that calls `handleSpin()` only when
   `canSpin && !anyOverlayOpen`. Needs HTTPS (live site / not plain-HTTP localhost).
 - **Wheel** — CSS `conic-gradient` slices + rotated labels; spin sets a large `rotation` with a
-  `cubic-bezier(0.1, 0.8, 0.3, 1)` transition solved so the precomputed winner lands under the
+  `cubic-bezier(0.12, 0.82, 0.1, 1)` transition solved so the precomputed winner lands under the
   top pointer. **Knock-out** mode removes each winner from the wheel itself — `remainingFoods`
   (`= wheelFoods` minus `roundWon` when knock-out is on) drives the slices, labels, landing math
   and the pick, so won dishes visibly vanish; toggling knock-out on starts a fresh round
