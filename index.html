@@ -10,15 +10,14 @@
     />
     <meta name="theme-color" content="#f8f3ec" />
 
-    <!-- Apply the saved (or system) theme before first paint to avoid a flash. -->
+    <!-- Match the device's dark/light preference before first paint (no flash). -->
     <style>
       html { background: #f8f3ec; }
       html.dark { background: #211a14; }
     </style>
     <script>
       try {
-        var t = JSON.parse(localStorage.getItem('wfd-theme'))
-        if (t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)) {
+        if (matchMedia('(prefers-color-scheme: dark)').matches) {
           document.documentElement.classList.add('dark')
         }
       } catch (e) { /* default to light */ }

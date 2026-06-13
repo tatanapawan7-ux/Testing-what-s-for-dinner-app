@@ -62,8 +62,6 @@ export default function App() {
   const [isTouch] = useState(
     () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches,
   )
-  // 'light' | 'dark' | null (= follow the system preference)
-  const [theme, setTheme] = useState(() => loadState('wfd-theme', null))
   const [shareCopied, setShareCopied] = useState(false) // brief "copied!" feedback
 
   // Smarter spinning
@@ -103,19 +101,19 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('wfd-shake', JSON.stringify(shake))
   }, [shake])
-  // Apply the theme: toggle the .dark class and keep browser chrome in sync.
-  const isDark =
-    theme === 'dark' ||
-    (theme !== 'light' &&
-      typeof matchMedia !== 'undefined' &&
-      matchMedia('(prefers-color-scheme: dark)').matches)
+  // Dark mode follows the device's preference automatically (no manual toggle).
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark)
-    localStorage.setItem('wfd-theme', JSON.stringify(theme))
-    document
-      .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', isDark ? '#211a14' : '#f8f3ec')
-  }, [theme, isDark])
+    const mq = matchMedia('(prefers-color-scheme: dark)')
+    const apply = () => {
+      document.documentElement.classList.toggle('dark', mq.matches)
+      document
+        .querySelector('meta[name="theme-color"]')
+        ?.setAttribute('content', mq.matches ? '#211a14' : '#f8f3ec')
+    }
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
   useEffect(() => {
     localStorage.setItem('wfd-variety', JSON.stringify(variety))
   }, [variety])
@@ -985,17 +983,9 @@ export default function App() {
         {winner ? `Tonight's dinner is ${winner.name}` : ''}
       </p>
 
-      <div className="relative mx-auto flex max-w-2xl flex-col gap-8 px-4 pb-10 pt-5 sm:px-6 sm:pb-14 sm:pt-7">
-        {/* Theme + sound (+ shake) toggles — a top row so they never overlap the hero */}
-        <div className="-mb-3 flex items-center justify-end gap-2">
-          <button
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={isDark ? 'Light mode' : 'Dark mode'}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-base shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
-          >
-            {isDark ? '☀️' : '🌙'}
-          </button>
+      <div className="relative mx-auto flex max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
+        {/* Sound + shake toggles */}
+        <div className="absolute right-4 top-4 z-10 flex items-center gap-2 sm:right-6">
           <button
             onClick={() => setMuted((m) => !m)}
             aria-label={muted ? 'Unmute sound' : 'Mute sound'}

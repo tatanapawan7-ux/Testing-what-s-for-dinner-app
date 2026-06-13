@@ -123,8 +123,9 @@ there's an on-brand `:focus-visible` ring and `::selection` tint. Custom animati
 (`pop-in`, `fade-in`, `float-up`, `glow-pulse`, `ping-once`) are plain `@keyframes`, all
 disabled/neutralised under `prefers-reduced-motion`. **Dark mode**: an `html.dark` block
 re-points the theme tokens (warm "ember & cocoa" palette), so token-based utilities flip
-wholesale; toggled via 🌙/☀️ (persisted `wfd-theme`, defaults to system), applied pre-paint
-by an inline script in `index.html` to avoid a flash, with `meta theme-color` kept in sync. The aesthetic is deliberately restrained
+wholesale; it **follows the device's `prefers-color-scheme` automatically** (no manual toggle),
+applied pre-paint by an inline script in `index.html` to avoid a flash, and an effect in `App`
+keeps the class + `meta theme-color` in sync when the system preference changes. The aesthetic is deliberately restrained
 (no looping shimmer/breathing effects) for a refined, professional feel.
 
 ## Architecture (`src/App.jsx`)
@@ -168,7 +169,7 @@ by an inline script in `index.html` to avoid a flash, with `meta theme-color` ke
 - **Persistence** — `{ activePlaceId, places }` → `localStorage` key `wfd-places-v1` via
   `bootstrapPlaces()` (migrates an old flat `wfd-foods` list into a "Home" place); history →
   `wfd-history`; spin prefs → `wfd-muted`, `wfd-variety`, `wfd-knockout`, `wfd-round`,
-  `wfd-favboost`, `wfd-shake`; theme → `wfd-theme`.
+  `wfd-favboost`, `wfd-shake`.
 - **Shake to spin** — opt-in 🤳 toggle (top-right cluster, touch devices only via
   `(pointer: coarse)`; persisted `wfd-shake`). Enabling calls
   `DeviceMotionEvent.requestPermission()` inside the tap (iOS 13+). A `devicemotion` listener

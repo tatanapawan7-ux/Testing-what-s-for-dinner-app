@@ -29,7 +29,7 @@ a celebratory winner modal and a persistent history of past spins.
   with text-share and clipboard fallbacks
 - 👥 **Group spin** — pass the phone around, everyone vetoes one dish, and the wheel
   decides among what's left
-- 🌙 **Dark mode** — a warm ember palette, following your system or toggled manually
+- 🌙 **Dark mode** — a warm ember palette that follows your device's light/dark setting
 - 📊 **Dinner stats** — total decided, eaten, and your top pick, summarised at a glance
 - 🕑 **Dinner history** timeline (tagged by place), persisted in `localStorage`; remove a
   single spin or clear the whole log
