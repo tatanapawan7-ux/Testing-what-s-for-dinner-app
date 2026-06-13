@@ -985,9 +985,9 @@ export default function App() {
         {winner ? `Tonight's dinner is ${winner.name}` : ''}
       </p>
 
-      <div className="relative mx-auto flex max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
-        {/* Theme + sound toggles */}
-        <div className="absolute right-4 top-4 z-10 flex items-center gap-2 sm:right-6">
+      <div className="relative mx-auto flex max-w-2xl flex-col gap-8 px-4 pb-10 pt-5 sm:px-6 sm:pb-14 sm:pt-7">
+        {/* Theme + sound (+ shake) toggles — a top row so they never overlap the hero */}
+        <div className="-mb-3 flex items-center justify-end gap-2">
           <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
             aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
